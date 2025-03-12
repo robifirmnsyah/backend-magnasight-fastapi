@@ -1,9 +1,23 @@
 from typing import Union
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routes import users, customers, tickets, groups, projects, services
 from database import connect_to_db, close_db_connection
 
 app = FastAPI(title="Magnasight API", version="0.1.0")
+
+origins = [
+    "http://localhost:3000",  # Add your frontend URL here
+    "http://35.219.47.175",   # Add your public IP here if needed
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 async def startup():
