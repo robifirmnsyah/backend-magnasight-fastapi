@@ -6,10 +6,7 @@ from database import connect_to_db, close_db_connection
 
 app = FastAPI(title="Magnasight API", version="0.1.0")
 
-origins = [
-    "http://localhost:3000",  # Add your frontend URL here
-    "http://35.219.47.175",   # Add your public IP here if needed
-]
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
