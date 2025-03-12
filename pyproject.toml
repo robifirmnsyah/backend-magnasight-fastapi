@@ -1,0 +1,14 @@
+[project]
+name = "backend-magnasight-fastapi"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "asyncpg>=0.30.0",
+    "bcrypt>=4.2.1",
+    "fastapi[standard]>=0.115.8",
+    "google-cloud-storage>=3.0.0",
+    "pyjwt>=2.10.1",
+    "uvicorn>=0.34.0",
+]

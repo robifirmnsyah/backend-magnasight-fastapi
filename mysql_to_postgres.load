@@ -1,0 +1,7 @@
+LOAD DATABASE
+     FROM mysql://user_mysql:password_mysql@host_mysql/support_ticket_db
+     INTO postgresql://magna@localhost/support_ticket_db
+
+ WITH include no drop, create tables, create indexes, reset sequences
+
+ SET work_mem to '16MB', maintenance_work_mem to '512 MB';
