@@ -75,6 +75,14 @@ async def get_group(group_id: str, db=Depends(get_db)):
         raise HTTPException(status_code=404, detail='Group not found')
     return dict(result)
 
+@router.get('/company/{company_id}', response_model=List[Group])
+async def get_groups_by_company_id(company_id: str, db=Depends(get_db)):
+    query = 'SELECT group_id, group_name, company_id FROM groups WHERE company_id = $1'
+    results = await db.fetch(query, company_id)
+    if not results:
+        raise HTTPException(status_code=404, detail='No groups found for this company')
+    return [dict(result) for result in results]
+
 @router.put('/{group_id}')
 async def update_group(group_id: str, group: GroupCreate, db=Depends(get_db)):
     query = '''

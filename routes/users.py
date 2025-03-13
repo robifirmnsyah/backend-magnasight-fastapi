@@ -120,13 +120,23 @@ async def get_users(db=Depends(get_db)):
     results = await db.fetch(query)
     return [dict(result) for result in results]
 
-@router.get('/{id_user}', response_model=User)
-async def get_user(id_user: str, db=Depends(get_db)):
-    query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_id, email, phone FROM users WHERE id_user = $1'
-    result = await db.fetchrow(query, id_user)
-    if not result:
+@router.get('/{id_user}', response_model=List[User])
+async def get_users_by_role(id_user: str, db=Depends(get_db)):
+    user_query = 'SELECT role, company_id FROM users WHERE id_user = $1'
+    user = await db.fetchrow(user_query, id_user)
+    if not user:
         raise HTTPException(status_code=404, detail='User not found')
-    return dict(result)
+
+    if user['role'] == 'Admin':
+        query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_id, email, phone FROM users'
+        results = await db.fetch(query)
+    elif user['role'] == 'Customer Admin':
+        query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_id, email, phone FROM users WHERE company_id = $1'
+        results = await db.fetch(query, user['company_id'])
+    else:
+        raise HTTPException(status_code=403, detail='Access forbidden')
+
+    return [dict(result) for result in results]
 
 @router.put('/{id_user}')
 async def update_user(id_user: str, user: UserUpdate, db=Depends(get_db)):
