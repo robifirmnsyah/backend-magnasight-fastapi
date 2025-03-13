@@ -7,6 +7,7 @@ import jwt
 import os
 import random
 import string
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -77,10 +78,12 @@ async def login(user: UserLogin, db=Depends(get_db)):
     if not bcrypt.checkpw(user.password.encode('utf-8'), user_data['password'].encode('utf-8')):
         raise HTTPException(status_code=401, detail='Invalid username or password')
 
+    expiration = datetime.utcnow() + timedelta(hours=1)
     token = jwt.encode({
         'id_user': user_data['id_user'],
         'username': user_data['username'],
-        'role': user_data['role']
+        'role': user_data['role'],
+        'exp': expiration
     }, SECRET_KEY, algorithm='HS256')
 
     return {
