@@ -9,29 +9,28 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Set up SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan ${{ vars.VM_EXTERNAL_IP }} >> ~/.ssh/known_hosts
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Debug SSH Key
-        run: |
-          echo "SSH Private Key Length: $(wc -c < ~/.ssh/id_ed25519)"
-          ls -lah ~/.ssh
-          cat ~/.ssh/known_hosts
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: dev-fairuz-agiza
 
       - name: Execute deployment script via SSH
         run: |
-          ssh -i ~/.ssh/id_ed25519 robi_firmansyah@${{ vars.VM_EXTERNAL_IP }} <<EOF
-          sudo -i
-          cd backend-magnasight-fastapi
-          git pull origin main
-          nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
+          gcloud compute ssh root@backend-magnasight \
+            --zone=asia-southeast2-c \
+            -- -i /root/.ssh/google_compute_engine << 'EOF'
+              cd backend-magnasight-fastapi
+              git pull origin main
+              nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
           EOF
+
 
 
