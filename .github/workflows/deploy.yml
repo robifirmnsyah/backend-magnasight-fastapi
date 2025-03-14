@@ -35,8 +35,7 @@ jobs:
         
             echo "Pushing Docker images to GAR..."
             docker push $IMAGE_NAME:latest
-            docker push $IMAGE_NAME:$IMAGE_TAG
-        
+            docker push $IMAGE_NAME:$IMAGE_TAG    
 
       - name: Deploy to GCP VM using SSH
         run: |
@@ -44,7 +43,7 @@ jobs:
             --zone=asia-southeast2-c \
             --command="
               sudo -i bash -c '
-              cd backend-magnasight-fastapi &&
+              cd ~/backend-magnasight-fastapi &&
               git pull origin main &&
               docker compose down &&
               docker compose pull &&
