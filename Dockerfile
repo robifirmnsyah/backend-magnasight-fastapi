@@ -1,19 +1,16 @@
-# Use the official Python image from the Docker Hub
-FROM python:3.10-slim
+FROM python:3.11-slim
 
-# Set the working directory in the container
+# Set the working directory
 WORKDIR /app
 
-# Copy the requirements file into the container
-COPY requirements.txt /app/
+# Copy the requirements file and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install the dependencies
-RUN pip install --no-cache-dir -r ./requirements.txt
+# Copy the application files
+COPY . .
 
-# Copy the rest of the application code into the container
-COPY . /app
-
-# Expose the port the app runs on
+# Expose port 8000 for FastAPI
 EXPOSE 8000
 
 # Command to run the application

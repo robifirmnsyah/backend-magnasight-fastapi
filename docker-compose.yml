@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: magna
+      POSTGRES_PASSWORD: M@gn@123
+      POSTGRES_DB: support_ticket_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - support-ticket-network
+
+  api:
+    build: .
+    container_name: backend-magnasight-fastapi
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    environment:
+      DB_HOST: postgres
+      DB_USER: magna
+      DB_PASSWORD: M@gn@123
+      DB_PORT: 5432
+      DB_NAME: support_ticket_db
+    networks:
+      - support-ticket-network
+
+networks:
+  support-ticket-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
