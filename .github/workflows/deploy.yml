@@ -24,13 +24,15 @@ jobs:
 
       - name: Execute deployment script via SSH
         run: |
-          gcloud compute ssh root@backend-magnasight \
+          gcloud compute ssh backend-magnasight \
             --zone=asia-southeast2-c \
-            -- -i /root/.ssh/google_compute_engine << 'EOF'
-              cd backend-magnasight-fastapi
-              git pull origin main
+            --command="
+              sudo -i bash -c '
+              cd backend-magnasight-fastapi &&
+              git pull origin main &&
               nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
-          EOF
+              '"
+
 
 
 
