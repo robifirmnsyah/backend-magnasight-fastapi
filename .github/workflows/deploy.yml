@@ -1,4 +1,4 @@
-name: Deploy to GCP VM
+name: Deploy FastAPI with Docker Compose
 
 on:
   push:
@@ -22,17 +22,20 @@ jobs:
         with:
           project_id: dev-fairuz-agiza
 
-      - name: Execute deployment script via SSH
+      - name: Build and push Docker images
         run: |
-          gcloud compute ssh backend-magnasight \
-            --zone=asia-southeast2-c \
-            --command="
-              sudo -i bash -c '
-              cd backend-magnasight-fastapi &&
-              git pull origin main &&
-              nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
-              '"
+          docker build -t gcr.io/dev-fairuz-agiza/backend-magnasight-fastapi:latest .
+          docker tag gcr.io/dev-fairuz-agiza/backend-magnasight-fastapi:latest asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-magnasight-fastapi:${{ github.sha }}
+          gcloud auth configure-docker
+          docker push asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-magnasight-fastapi:latest
+          docker push asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-magnasight-fastapi:${{ github.sha }}
 
-
-
-
+      - name: Deploy to GCP VM using SSH
+        run: |
+          gcloud compute ssh root@backend-magnasight --zone=asia-southeast2-c --command="
+            cd backend-magnasight-fastapi &&
+            git pull origin main &&
+            docker compose down &&
+            docker compose pull &&
+            docker compose up -d
+          "
