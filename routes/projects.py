@@ -77,6 +77,14 @@ async def get_project(project_id: str, db=Depends(get_db)):
         raise HTTPException(status_code=404, detail='Project not found')
     return dict(result)
 
+@router.get('/company/{company_id}', response_model=List[Project])
+async def get_projects_by_company_id(company_id: str, db=Depends(get_db)):
+    query = 'SELECT project_id, project_name, company_id, billing_id FROM projects WHERE company_id = $1'
+    results = await db.fetch(query, company_id)
+    if not results:
+        raise HTTPException(status_code=404, detail='No projects found for this company')
+    return [dict(result) for result in results]
+
 @router.put('/{project_id}')
 async def update_project(project_id: str, project: ProjectCreate, db=Depends(get_db)):
     # Fetch billing_id from customers table
