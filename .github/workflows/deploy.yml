@@ -24,11 +24,19 @@ jobs:
 
       - name: Build and push Docker images
         run: |
-          docker build -t gcr.io/dev-fairuz-agiza/backend-magnasight-fastapi:latest .
-          docker tag gcr.io/dev-fairuz-agiza/backend-magnasight-fastapi:latest asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-magnasight-fastapi:${{ github.sha }}
-          gcloud auth configure-docker
-          docker push asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-magnasight-fastapi:latest
-          docker push asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-magnasight-fastapi:${{ github.sha }}
+            IMAGE_NAME=asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-magnasight-fastapi
+            IMAGE_TAG=${{ github.sha }}
+        
+            echo "Building Docker image..."
+            docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$IMAGE_TAG .
+        
+            echo "Authenticating to Google Artifact Registry..."
+            gcloud auth configure-docker asia-southeast2-docker.pkg.dev
+        
+            echo "Pushing Docker images to GAR..."
+            docker push $IMAGE_NAME:latest
+            docker push $IMAGE_NAME:$IMAGE_TAG
+        
 
       - name: Deploy to GCP VM using SSH
         run: |
