@@ -17,15 +17,16 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > private_key
           chmod 600 private_key
 
-      - name: Debug IP
-        run: echo "VM IP: ${{ vars.VM_EXTERNAL_IP }}"
-        env:
-          VM_EXTERNAL_IP: ${{ secrets.VM_EXTERNAL_IP }}
+      - name: Debug Variables
+        run: |
+          echo "VM IP: ${{ vars.VM_EXTERNAL_IP }}"
+          echo "SSH PRIVATE KEY Length: $(echo -n '${{ secrets.SSH_PRIVATE_KEY }}' | wc -c)"
 
       - name: Deploy via SSH
         run: |
-          ssh -o StrictHostKeyChecking=no -i private_key root@VM_EXTERNAL_IP "
-            cd backend-magnasight-fastapi/ &&
-            git pull origin main &&
+          ssh -o StrictHostKeyChecking=no -i private_key root@${{ vars.VM_EXTERNAL_IP }} << 'EOF'
+            cd backend-magnasight-fastapi/
+            git pull origin main
             nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
-          "
+          EOF
+
