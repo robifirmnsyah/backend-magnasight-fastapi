@@ -17,6 +17,11 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > private_key
           chmod 600 private_key
 
+      - name: Debug IP
+        run: echo "VM IP: ${{ vars.VM_EXTERNAL_IP }}"
+        env:
+          VM_EXTERNAL_IP: ${{ secrets.VM_EXTERNAL_IP }}
+
       - name: Deploy via SSH
         run: |
           ssh -o StrictHostKeyChecking=no -i private_key root@VM_EXTERNAL_IP "
