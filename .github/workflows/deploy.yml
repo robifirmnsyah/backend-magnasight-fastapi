@@ -19,8 +19,8 @@ jobs:
 
       - name: Deploy via SSH
         run: |
-          ssh -o StrictHostKeyChecking=no -i private_key user@VM_EXTERNAL_IP "
-            cd /path/to/app &&
+          ssh -o StrictHostKeyChecking=no -i private_key root@VM_EXTERNAL_IP "
+            cd backend-magnasight-fastapi/ &&
             git pull origin main &&
-            docker-compose up -d --build
+            nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
           "
