@@ -41,7 +41,7 @@ jobs:
       - name: Deploy to GCP VM using SSH
         run: |
           gcloud compute ssh backend-magnasight --zone=asia-southeast2-c --command="
-            sudo su - &&
+            sudo -i &&
             cd /root/backend-magnasight-fastapi &&
             git pull origin main &&
             docker compose down &&
