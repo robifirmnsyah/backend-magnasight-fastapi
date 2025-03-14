@@ -4,30 +4,38 @@ services:
   postgres:
     image: postgres:latest
     container_name: postgres_db
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: magna
-      POSTGRES_PASSWORD: M@gn@123
-      POSTGRES_DB: support_ticket_db
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - support-ticket-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      retries: 5
+      start_period: 10s
 
   api:
-    build: .
+    image: asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-magnasight-fastapi:latest
     container_name: backend-magnasight-fastapi
+    restart: unless-stopped
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       DB_HOST: postgres
-      DB_USER: magna
-      DB_PASSWORD: M@gn@123
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
       DB_PORT: 5432
-      DB_NAME: support_ticket_db
+      DB_NAME: ${DB_NAME}
     networks:
       - support-ticket-network
 
