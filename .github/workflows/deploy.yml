@@ -12,21 +12,23 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      - name: Setup SSH Key
+      - name: Set up SSH key
         run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > private_key
-          chmod 600 private_key
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan ${{ vars.VM_EXTERNAL_IP }} >> ~/.ssh/known_hosts
 
-      - name: Debug Variables
+      - name: Debug SSH Key
         run: |
-          echo "VM IP: ${{ vars.VM_EXTERNAL_IP }}"
-          echo "SSH PRIVATE KEY Length: $(echo -n '${{ secrets.SSH_PRIVATE_KEY }}' | wc -c)"
+          echo "SSH Private Key Length: $(wc -c < ~/.ssh/id_ed25519)"
+          ls -lah ~/.ssh
+          cat ~/.ssh/known_hosts
 
-      - name: Deploy via SSH
-        run: |
-          ssh -o StrictHostKeyChecking=no -i private_key root@${{ vars.VM_EXTERNAL_IP }} << 'EOF'
-            cd backend-magnasight-fastapi/
-            git pull origin main
-            nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
-          EOF
+      - name: Execute deployment script via SSH
+        run: ssh -i ~/.ssh/id_ed25519 root@${{ vars.VM_EXTERNAL_IP }} 'bash -s' << 'EOF'
+          cd backend-magnasight-fastapi
+          git pull origin main
+          nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
+        EOF
 
