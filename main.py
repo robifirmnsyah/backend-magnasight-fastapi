@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes import users, customers, tickets, groups, projects, services
 from database import connect_to_db, close_db_connection
 
-app = FastAPI(title="Magnasight API", version="0.1.0")
+app = FastAPI(title="Magnasight API", version="0.2.0")
 
 origins = ["*"]
 
