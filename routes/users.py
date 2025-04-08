@@ -122,20 +122,26 @@ async def get_users(db=Depends(get_db)):
 
 @router.get('/{id_user}', response_model=List[User])
 async def get_users_by_role(id_user: str, db=Depends(get_db)):
-    user_query = 'SELECT role, company_id FROM users WHERE id_user = $1'
+    user_query = 'SELECT company_id FROM users WHERE id_user = $1'
     user = await db.fetchrow(user_query, id_user)
     if not user:
         raise HTTPException(status_code=404, detail='User not found')
 
-    if user['role'] == 'Admin':
-        query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_id, email, phone FROM users'
-        results = await db.fetch(query)
-    elif user['role'] == 'Customer Admin':
-        query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_id, email, phone FROM users WHERE company_id = $1'
-        results = await db.fetch(query, user['company_id'])
-    else:
-        raise HTTPException(status_code=403, detail='Access forbidden')
+    query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_id, email, phone FROM users WHERE company_id = $1'
+    results = await db.fetch(query, user['company_id'])
 
+    return [dict(result) for result in results]
+
+@router.get('/company/{company_id}', response_model=List[User])
+async def get_users_by_company_id(company_id: str, db=Depends(get_db)):
+    query = '''
+        SELECT id_user, role, full_name, username, company_id, company_name, billing_id, email, phone 
+        FROM users 
+        WHERE company_id = $1
+    '''
+    results = await db.fetch(query, company_id)
+    if not results:
+        raise HTTPException(status_code=404, detail='No users found for the given company ID')
     return [dict(result) for result in results]
 
 @router.put('/{id_user}')
