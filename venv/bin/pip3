@@ -1,4 +1,4 @@
-#!/Users/robifirmansyah/Documents/backend-magnasight-fastapi/venv/bin/python
+#!/Users/robifirmansyah/Documents/backend-magnasight-fastapi/venv/bin/python3.12
 # -*- coding: utf-8 -*-
 import re
 import sys

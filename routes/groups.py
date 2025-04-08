@@ -104,16 +104,16 @@ async def delete_group(group_id: str, db=Depends(get_db)):
     return {'message': 'Group deleted successfully'}
 
 @router.post('/{group_id}/users')
-async def add_user_to_group(group_id: str, user_group: UserGroup, db=Depends(get_db)):
+async def add_user_to_group(group_id: str, id_user: str, db=Depends(get_db)):
     # Check if the user is already in the group
     check_query = 'SELECT * FROM user_groups WHERE id_user = $1 AND group_id = $2'
-    existing_user_group = await db.fetchrow(check_query, user_group.id_user, group_id)
+    existing_user_group = await db.fetchrow(check_query, id_user, group_id)
     if existing_user_group:
         raise HTTPException(status_code=400, detail='User is already in the group')
 
     # Add the user to the group
     query = 'INSERT INTO user_groups (id_user, group_id) VALUES ($1, $2)'
-    await db.execute(query, user_group.id_user, group_id)
+    await db.execute(query, id_user, group_id)
     return {'message': 'User added to group successfully'}
 
 @router.get('/{group_id}/users', response_model=List[UserGroup])
