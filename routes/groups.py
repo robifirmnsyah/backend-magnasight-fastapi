@@ -131,6 +131,14 @@ async def get_users_in_group(group_id: str, db=Depends(get_db)):
     results = await db.fetch(query, group_id)
     return [dict(result) for result in results]
 
+@router.delete('/{group_id}/users/{id_user}')
+async def delete_user_from_group(group_id: str, id_user: str, db=Depends(get_db)):
+    query = 'DELETE FROM user_groups WHERE group_id = $1 AND id_user = $2'
+    result = await db.execute(query, group_id, id_user)
+    if result == 'DELETE 0':
+        raise HTTPException(status_code=404, detail='User not found in the group')
+    return {'message': 'User removed from group successfully'}
+
 @router.get('/user/{id_user}/groups', response_model=List[UserGroups])
 async def get_groups_for_user(id_user: str, db=Depends(get_db)):
     query = '''
