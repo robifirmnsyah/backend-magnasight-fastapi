@@ -22,12 +22,13 @@ async def get_db():
 
 # Models
 class Service(BaseModel):
+    id: int
     service_name: str
 
 # Endpoints
 @router.get('/', response_model=List[Service])
 async def get_services(db=Depends(get_db)):
-    query = 'SELECT * FROM services'
+    query = 'SELECT id, service_name FROM services'
     try:
         results = await db.fetch(query)
     except asyncpg.exceptions.PostgresError as err:
