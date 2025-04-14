@@ -97,10 +97,17 @@ async def update_group(group_id: str, group: GroupCreate, db=Depends(get_db)):
 
 @router.delete('/{group_id}')
 async def delete_group(group_id: str, db=Depends(get_db)):
-    query = 'DELETE FROM groups WHERE group_id = $1'
-    result = await db.execute(query, group_id)
+    # Hapus referensi di tabel user_groups terlebih dahulu
+    delete_user_groups_query = 'DELETE FROM user_groups WHERE group_id = $1'
+    await db.execute(delete_user_groups_query, group_id)
+
+    # Hapus grup dari tabel groups
+    delete_group_query = 'DELETE FROM groups WHERE group_id = $1'
+    result = await db.execute(delete_group_query, group_id)
+
     if result == 'DELETE 0':
         raise HTTPException(status_code=404, detail='Group not found')
+
     return {'message': 'Group deleted successfully'}
 
 @router.post('/{group_id}/users')
