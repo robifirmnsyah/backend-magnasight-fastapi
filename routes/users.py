@@ -87,7 +87,7 @@ async def login(user: UserLogin, db=Depends(get_db)):
     }, SECRET_KEY, algorithm='HS256')
 
     # Rename 'billing_id' to 'billing_account_id' in the response
-    user_data['billing_account_id'] = user_data.pop('billing_id')
+    user_data['billing_account_id'] = user_data.pop('billing_account_id')
 
     return {
         'message': 'Login successful',
