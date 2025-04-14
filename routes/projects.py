@@ -26,7 +26,7 @@ class Project(BaseModel):
     project_id: str
     project_name: str
     company_id: str
-    billing_id: str
+    billing_account_id: str
 
 class ProjectCreate(BaseModel):
     project_name: str
@@ -48,30 +48,30 @@ def generate_project_id() -> str:
 async def create_project(project: ProjectCreate, db=Depends(get_db)):
     project_id = generate_project_id()
     
-    # Fetch billing_id from customers table
-    company_query = 'SELECT billing_id FROM customers WHERE company_id = $1'
+    # Fetch billing_account_id from customers table
+    company_query = 'SELECT billing_account_id FROM customers WHERE company_id = $1'
     company = await db.fetchrow(company_query, project.company_id)
     if not company:
         raise HTTPException(status_code=404, detail='Company not found')
     
-    billing_id = company['billing_id']
+    billing_account_id = company['billing_account_id']
     
     query = '''
-        INSERT INTO projects (project_id, project_name, company_id, billing_id) 
+        INSERT INTO projects (project_id, project_name, company_id, billing_account_id) 
         VALUES ($1, $2, $3, $4)
     '''
-    await db.execute(query, project_id, project.project_name, project.company_id, billing_id)
+    await db.execute(query, project_id, project.project_name, project.company_id, billing_account_id)
     return {'message': 'Project created successfully', 'project_id': project_id}
 
 @router.get('/', response_model=List[Project])
 async def get_projects(db=Depends(get_db)):
-    query = 'SELECT project_id, project_name, company_id, billing_id FROM projects'
+    query = 'SELECT project_id, project_name, company_id, billing_account_id FROM projects'
     results = await db.fetch(query)
     return [dict(result) for result in results]
 
 @router.get('/{project_id}', response_model=Project)
 async def get_project(project_id: str, db=Depends(get_db)):
-    query = 'SELECT project_id, project_name, company_id, billing_id FROM projects WHERE project_id = $1'
+    query = 'SELECT project_id, project_name, company_id, billing_account_id FROM projects WHERE project_id = $1'
     result = await db.fetchrow(query, project_id)
     if not result:
         raise HTTPException(status_code=404, detail='Project not found')
@@ -79,7 +79,7 @@ async def get_project(project_id: str, db=Depends(get_db)):
 
 @router.get('/company/{company_id}', response_model=List[Project])
 async def get_projects_by_company_id(company_id: str, db=Depends(get_db)):
-    query = 'SELECT project_id, project_name, company_id, billing_id FROM projects WHERE company_id = $1'
+    query = 'SELECT project_id, project_name, company_id, billing_account_id FROM projects WHERE company_id = $1'
     results = await db.fetch(query, company_id)
     if not results:
         raise HTTPException(status_code=404, detail='No projects found for this company')
@@ -87,20 +87,20 @@ async def get_projects_by_company_id(company_id: str, db=Depends(get_db)):
 
 @router.put('/{project_id}')
 async def update_project(project_id: str, project: ProjectCreate, db=Depends(get_db)):
-    # Fetch billing_id from customers table
-    company_query = 'SELECT billing_id FROM customers WHERE company_id = $1'
+    # Fetch billing_account_id from customers table
+    company_query = 'SELECT billing_account_id FROM customers WHERE company_id = $1'
     company = await db.fetchrow(company_query, project.company_id)
     if not company:
         raise HTTPException(status_code=404, detail='Company not found')
     
-    billing_id = company['billing_id']
+    billing_account_id = company['billing_account_id']
     
     query = '''
         UPDATE projects 
-        SET project_name = $1, company_id = $2, billing_id = $3 
+        SET project_name = $1, company_id = $2, billing_account_id = $3 
         WHERE project_id = $4
     '''
-    result = await db.execute(query, project.project_name, project.company_id, billing_id, project_id)
+    result = await db.execute(query, project.project_name, project.company_id, billing_account_id, project_id)
     if result == 'UPDATE 0':
         raise HTTPException(status_code=404, detail='Project not found')
     return {'message': 'Project updated successfully'}

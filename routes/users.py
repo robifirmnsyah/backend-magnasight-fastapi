@@ -35,7 +35,7 @@ class User(BaseModel):
     username: str
     company_id: str
     company_name: str
-    billing_id: str
+    billing_account_id: str
     email: str
     phone: str
 
@@ -97,26 +97,26 @@ async def register(user: UserCreate, db=Depends(get_db)):
     id_user = generate_unique_id('USER')
     hashed_password = bcrypt.hashpw(user.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-    company_query = 'SELECT company_name, billing_id FROM customers WHERE company_id = $1'
+    company_query = 'SELECT company_name, billing_account_id FROM customers WHERE company_id = $1'
     company = await db.fetchrow(company_query, user.company_id)
     if not company:
         raise HTTPException(status_code=404, detail='Company not found')
 
     user_query = '''
-        INSERT INTO users (id_user, role, full_name, username, password, company_id, company_name, billing_id, email, phone) 
+        INSERT INTO users (id_user, role, full_name, username, password, company_id, company_name, billing_account_id, email, phone) 
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     '''
     try:
-        await db.execute(user_query, id_user, user.role, user.full_name, user.username, hashed_password, user.company_id, company['company_name'], company['billing_id'], user.email, user.phone)
+        await db.execute(user_query, id_user, user.role, user.full_name, user.username, hashed_password, user.company_id, company['company_name'], company['billing_account_id'], user.email, user.phone)
     except asyncpg.exceptions.StringDataRightTruncationError as e:
-        print(id_user, user.role, user.full_name, user.username, hashed_password, user.company_id, company['company_name'], company['billing_id'], user.email, user.phone)
+        print(id_user, user.role, user.full_name, user.username, hashed_password, user.company_id, company['company_name'], company['billing_account_id'], user.email, user.phone)
         raise HTTPException(status_code=400, detail='Invalid data provided')
 
     return {'message': 'User registered successfully', 'id_user': id_user}
 
 @router.get('/', response_model=List[User])
 async def get_users(db=Depends(get_db)):
-    query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_id, email, phone FROM users'
+    query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_account_id, email, phone FROM users'
     results = await db.fetch(query)
     return [dict(result) for result in results]
 
@@ -127,7 +127,7 @@ async def get_users_by_role(id_user: str, db=Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail='User not found')
 
-    query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_id, email, phone FROM users WHERE company_id = $1'
+    query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_account_id, email, phone FROM users WHERE company_id = $1'
     results = await db.fetch(query, user['company_id'])
 
     return [dict(result) for result in results]
@@ -135,7 +135,7 @@ async def get_users_by_role(id_user: str, db=Depends(get_db)):
 @router.get('/company/{company_id}', response_model=List[User])
 async def get_users_by_company_id(company_id: str, db=Depends(get_db)):
     query = '''
-        SELECT id_user, role, full_name, username, company_id, company_name, billing_id, email, phone 
+        SELECT id_user, role, full_name, username, company_id, company_name, billing_account_id, email, phone 
         FROM users 
         WHERE company_id = $1
     '''

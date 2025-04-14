@@ -38,7 +38,7 @@ class UserGroup(BaseModel):
     username: str
     company_id: str
     company_name: str
-    billing_id: str
+    billing_account_id: str
     email: str
     phone: str
 
@@ -123,7 +123,7 @@ async def add_users_to_group(group_id: str, id_users: List[str], db=Depends(get_
 @router.get('/{group_id}/users', response_model=List[UserGroup])
 async def get_users_in_group(group_id: str, db=Depends(get_db)):
     query = '''
-        SELECT u.id_user, u.role, u.full_name, u.username, u.company_id, u.company_name, u.billing_id, u.email, u.phone 
+        SELECT u.id_user, u.role, u.full_name, u.username, u.company_id, u.company_name, u.billing_account_id, u.email, u.phone 
         FROM users u
         JOIN user_groups ug ON u.id_user = ug.id_user
         WHERE ug.group_id = $1

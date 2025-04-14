@@ -25,13 +25,13 @@ async def get_db():
 class Customer(BaseModel):
     company_id: str
     company_name: str
-    billing_id: str
+    billing_account_id: str
     maintenance: str
     limit_ticket: int
 
 class CustomerCreate(BaseModel):
     company_name: str
-    billing_id: str
+    billing_account_id: str
     maintenance: str
     limit_ticket: int
 
@@ -44,21 +44,21 @@ def generate_company_id() -> str:
 async def create_customer(customer: CustomerCreate, db=Depends(get_db)):
     company_id = generate_company_id()
     query = '''
-        INSERT INTO customers (company_id, company_name, billing_id, maintenance, limit_ticket) 
+        INSERT INTO customers (company_id, company_name, billing_account_id, maintenance, limit_ticket) 
         VALUES ($1, $2, $3, $4, $5)
     '''
-    await db.execute(query, company_id, customer.company_name, customer.billing_id, customer.maintenance, customer.limit_ticket)
+    await db.execute(query, company_id, customer.company_name, customer.billing_account_id, customer.maintenance, customer.limit_ticket)
     return {'message': 'Customer created successfully', 'company_id': company_id}
 
 @router.get('/', response_model=List[Customer])
 async def get_customers(db=Depends(get_db)):
-    query = 'SELECT company_id, company_name, billing_id, maintenance, limit_ticket FROM customers'
+    query = 'SELECT company_id, company_name, billing_account_id, maintenance, limit_ticket FROM customers'
     results = await db.fetch(query)
     return [dict(result) for result in results]
 
 @router.get('/{company_id}', response_model=Customer)
 async def get_customer(company_id: str, db=Depends(get_db)):
-    query = 'SELECT company_id, company_name, billing_id, maintenance, limit_ticket FROM customers WHERE company_id = $1'
+    query = 'SELECT company_id, company_name, billing_account_id, maintenance, limit_ticket FROM customers WHERE company_id = $1'
     result = await db.fetchrow(query, company_id)
     if not result:
         raise HTTPException(status_code=404, detail='Customer not found')
@@ -68,10 +68,10 @@ async def get_customer(company_id: str, db=Depends(get_db)):
 async def update_customer(company_id: str, customer: CustomerCreate, db=Depends(get_db)):
     query = '''
         UPDATE customers 
-        SET company_name = $1, billing_id = $2, maintenance = $3, limit_ticket = $4 
+        SET company_name = $1, billing_account_id = $2, maintenance = $3, limit_ticket = $4 
         WHERE company_id = $5
     '''
-    result = await db.execute(query, customer.company_name, customer.billing_id, customer.maintenance, customer.limit_ticket, company_id)
+    result = await db.execute(query, customer.company_name, customer.billing_account_id, customer.maintenance, customer.limit_ticket, company_id)
     if result == 'UPDATE 0':
         raise HTTPException(status_code=404, detail='Customer not found')
     return {'message': 'Customer updated successfully'}
