@@ -124,27 +124,3 @@ async def get_projects_for_user(id_user: str, db=Depends(get_db)):
     '''
     results = await db.fetch(query, id_user)
     return [dict(result) for result in results]
-
-@router.post('/{group_id}/projects')
-async def add_projects_to_group(group_id: str, project_ids: List[str] = Body(...), db=Depends(get_db)):
-    added = []
-    skipped = []
-
-    for project_id in project_ids:
-        # Cek dulu, udah ada belum
-        check_query = 'SELECT 1 FROM group_projects WHERE group_id = $1 AND project_id = $2'
-        exists = await db.fetchrow(check_query, group_id, project_id)
-        if exists:
-            skipped.append(project_id)
-            continue
-        
-        # Insert kalau belum ada
-        insert_query = 'INSERT INTO group_projects (group_id, project_id) VALUES ($1, $2)'
-        await db.execute(insert_query, group_id, project_id)
-        added.append(project_id)
-
-    return {
-        "message": "Finished processing projects",
-        "added": added,
-        "skipped_existing": skipped
-    }
