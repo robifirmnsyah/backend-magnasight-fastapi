@@ -113,6 +113,16 @@ async def delete_project(project_id: str, db=Depends(get_db)):
         raise HTTPException(status_code=404, detail='Project not found')
     return {'message': 'Project deleted successfully'}
 
+@router.get('/group/{group_id}/projects', response_model=List[str])
+async def get_projects_by_group(group_id: str, db=Depends(get_db)):
+    query = '''
+        SELECT project_id
+        FROM group_projects
+        WHERE group_id = $1
+    '''
+    results = await db.fetch(query, group_id)
+    return [record['project_id'] for record in results]
+
 @router.get('/user/{id_user}/projects', response_model=List[str])
 async def get_project_ids_for_user(id_user: str, db=Depends(get_db)):
     query = '''
