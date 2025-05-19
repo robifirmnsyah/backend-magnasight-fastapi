@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Body
 from pydantic import BaseModel
 from typing import List
 import asyncpg
@@ -126,14 +126,14 @@ async def get_projects_for_user(id_user: str, db=Depends(get_db)):
     return [dict(result) for result in results]
 
 @router.post('/{group_id}/project')
-async def add_project_to_group(group_id: str, project: ProjectIDBody, db=Depends(get_db)):
+async def add_project_to_group(group_id: str, project_id: str = Body(...), db=Depends(get_db)):
     # Cek apakah proyek ini udah terhubung sama grup
     check_query = 'SELECT * FROM group_projects WHERE group_id = $1 AND project_id = $2'
-    existing_project_group = await db.fetchrow(check_query, group_id, project.project_id)
+    existing_project_group = await db.fetchrow(check_query, group_id, project_id)
     if existing_project_group:
         raise HTTPException(status_code=400, detail='Project is already associated with the group')
 
     # Tambahkan proyek ke grup
     query = 'INSERT INTO group_projects (group_id, project_id) VALUES ($1, $2)'
-    await db.execute(query, group_id, project.project_id)
+    await db.execute(query, group_id, project_id)
     return {'message': 'Project added to group successfully'}
