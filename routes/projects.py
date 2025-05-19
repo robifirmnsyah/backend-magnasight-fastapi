@@ -128,7 +128,7 @@ async def get_projects_for_user(id_user: str, db=Depends(get_db)):
 @router.post('/{project_id}/groups')
 async def add_group_to_project(project_id: str, group_project: GroupProject, db=Depends(get_db)):
     # Check if the group is already associated with the project
-    check_query = 'SELECT * FROM group_projects WHERE project_id = $1 AND group_id = $2'
+    check_query = 'SELECT * FROM group_projects WHERE group_id = $2'
     existing_group_project = await db.fetchrow(check_query, project_id, group_project.group_id)
     if existing_group_project:
         raise HTTPException(status_code=400, detail='Group is already associated with the project')
