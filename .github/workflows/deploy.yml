@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted  # Penting: pakai runner sendiri, bukan ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,44 +22,29 @@ jobs:
         with:
           project_id: dev-fairuz-agiza
 
-      - name: Write GCP credentials to file
-        run: echo "$GCP_CREDENTIALS_JSON" > ${{ github.workspace }}/gcp-sa.json
-        env:
-          GCP_CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}
-
-      - name: Set GOOGLE_APPLICATION_CREDENTIALS env
-        run: echo "GOOGLE_APPLICATION_CREDENTIALS=${{ github.workspace }}/gcp-sa.json" >> $GITHUB_ENV
+      - name: Configure Docker to use Artifact Registry
+        run: gcloud auth configure-docker asia-southeast2-docker.pkg.dev
 
       - name: Build and push Docker images
         run: |
-            IMAGE_NAME=asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-repo/backend-magnasight-fastapi
-            IMAGE_TAG=${{ github.sha }}
-        
-            echo "Building Docker image..."
-            docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$IMAGE_TAG .
-        
-            echo "Authenticating to Google Artifact Registry..."
-            gcloud auth configure-docker asia-southeast2-docker.pkg.dev
-        
-            echo "Pushing Docker images to GAR..."
-            docker push $IMAGE_NAME:latest
-            docker push $IMAGE_NAME:$IMAGE_TAG
-        
+          IMAGE_NAME=asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-repo/backend-magnasight-fastapi
+          IMAGE_TAG=${{ github.sha }}
 
-      - name: Deploy to GCP VM using SSH
+          echo "Building Docker image..."
+          docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$IMAGE_TAG .
+
+          echo "Pushing Docker images to Google Artifact Registry..."
+          docker push $IMAGE_NAME:latest
+          docker push $IMAGE_NAME:$IMAGE_TAG
+
+      - name: Deploy containers
         run: |
-          gcloud compute ssh backend-magnasight \
-            --zone=asia-southeast2-c \
-            --command="
-              sudo -i bash -c '
-              cd backend-magnasight-fastapi || exit 1
+          echo "Stopping old containers..."
+          docker compose down
 
-              echo \"Pulling latest code...\"
-              git pull origin main || exit 1
+          echo "Pulling latest image..."
+          docker compose pull
 
-              echo \"Recreating containers...\"
-              docker compose down || exit 1
-              docker compose pull || exit 1
-              docker compose up -d || exit 1
-            '"
-
+          echo "Starting containers..."
+          docker compose up -d
+          echo "Deployment completed successfully!"
