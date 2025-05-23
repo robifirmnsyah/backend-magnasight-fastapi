@@ -23,7 +23,7 @@ services:
 
   api:
     image: asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-repo/backend-magnasight-fastapi:latest
-    container_name: backend-magnasight-fastapi
+    container_name: backend-magnasight
     restart: unless-stopped
     ports:
       - "8000:8000"
