@@ -49,13 +49,20 @@ jobs:
       - name: Deploy to GCP VM using SSH
         run: |
           gcloud compute ssh backend-magnasight \
-            --zone=asia-southeast2-c \
-            --command="
-              sudo -i bash -c '
-              cd backend-magnasight-fastapi &&
-              git pull origin main &&
-              docker compose down &&
-              docker compose pull &&
-              docker compose up -d
-           '"
+  --zone=asia-southeast2-c \
+  --command="
+    sudo -i bash -c '
+    cd backend-magnasight-fastapi &&
+
+    echo \"Writing GCP credentials...\"
+    echo \"${{ secrets.GCP_CREDENTIALS_JSON }}\" > gcp-sa.json &&
+
+    echo \"Pulling latest code...\"
+    git pull origin main &&
+
+    echo \"Rebuilding containers...\"
+    docker compose down &&
+    docker compose pull &&
+    docker compose up -d
+  '"
 
