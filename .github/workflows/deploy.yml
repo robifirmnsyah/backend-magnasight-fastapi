@@ -47,23 +47,15 @@ jobs:
         
 
       - name: Deploy to GCP VM using SSH
-        env:
-          GCP_SA_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}
         run: |
           gcloud compute ssh backend-magnasight \
             --zone=asia-southeast2-c \
             --command="
               sudo -i bash -c '
-              cd backend-magnasight-fastapi || exit 1
+              cd backend-magnasight-fastapi &&
+              git pull origin main &&
+              docker compose down &&
+              docker compose pull &&
+              docker compose up -d
+           '"
 
-              echo \"Creating gcp-sa.json from secret...\"
-              echo \"$GCP_SA_JSON\" > gcp-sa.json
-
-              echo \"Pulling latest code...\"
-              git pull origin main || exit 1
-
-              echo \"Recreating containers...\"
-              docker compose down || exit 1
-              docker compose pull || exit 1
-              docker compose up -d || exit 1
-            '"

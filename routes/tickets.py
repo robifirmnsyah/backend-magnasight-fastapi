@@ -6,7 +6,7 @@ import asyncpg
 import os
 import random
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -63,14 +63,21 @@ def generate_ticket_id() -> str:
 
 GCS_BUCKET_NAME = os.getenv('GCS_BUCKET_NAME', 'magnasight-attachment')
 
-# Fungsi upload file ke GCS
 def upload_file_to_gcs(file: UploadFile, destination_blob_name: str) -> str:
     client = storage.Client()
     bucket = client.bucket(GCS_BUCKET_NAME)
     blob = bucket.blob(destination_blob_name)
+
+    # Upload file ke GCS
     blob.upload_from_file(file.file, content_type=file.content_type)
-    blob.make_public()
-    return blob.public_url
+
+    # Generate signed URL
+    url = blob.generate_signed_url(
+        version="v4",
+        expiration=timedelta(minutes=15),
+        method="GET"
+    )
+    return url
 
 # Endpoints
 @router.post('/', response_model=Ticket)
