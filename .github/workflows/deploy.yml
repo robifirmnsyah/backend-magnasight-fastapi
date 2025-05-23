@@ -52,10 +52,14 @@ jobs:
             --zone=asia-southeast2-c \
             --command="
               sudo -i bash -c '
-              cd backend-magnasight-fastapi &&
-              git pull origin main &&
-              docker compose down &&
-              docker compose pull &&
-              docker compose up -d
-           '"
+              cd backend-magnasight-fastapi || exit 1
+
+              echo \"Pulling latest code...\"
+              git pull origin main || exit 1
+
+              echo \"Recreating containers...\"
+              docker compose down || exit 1
+              docker compose pull || exit 1
+              docker compose up -d || exit 1
+            '"
 
