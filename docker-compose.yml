@@ -36,6 +36,9 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_PORT: 5432
       DB_NAME: ${DB_NAME}
+      GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-sa.json
+    volumes:
+      - ./gcp-sa.json:/app/gcp-sa.json:ro
     networks:
       - support-ticket-network
 
