@@ -15,54 +15,49 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
 
       - name: Set up gcloud CLI
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: dev-fairuz-agiza
 
-      - name: Write GCP credentials to file
-        run: echo "$GCP_CREDENTIALS_JSON" > ${{ github.workspace }}/gcp-sa.json
-        env:
-          GCP_CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}
-
-      - name: Set GOOGLE_APPLICATION_CREDENTIALS env
-        run: echo "GOOGLE_APPLICATION_CREDENTIALS=${{ github.workspace }}/gcp-sa.json" >> $GITHUB_ENV
-
       - name: Build and push Docker images
         run: |
-            IMAGE_NAME=asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-repo/backend-magnasight-fastapi
-            IMAGE_TAG=${{ github.sha }}
-        
-            echo "Building Docker image..."
-            docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$IMAGE_TAG .
-        
-            echo "Authenticating to Google Artifact Registry..."
-            gcloud auth configure-docker asia-southeast2-docker.pkg.dev
-        
-            echo "Pushing Docker images to GAR..."
-            docker push $IMAGE_NAME:latest
-            docker push $IMAGE_NAME:$IMAGE_TAG
-        
+          IMAGE_NAME=asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-repo/backend-magnasight-fastapi
+          IMAGE_TAG=${{ github.sha }}
+
+          echo "Building Docker image..."
+          docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$IMAGE_TAG .
+
+          echo "Authenticating to Google Artifact Registry..."
+          gcloud auth configure-docker asia-southeast2-docker.pkg.dev
+
+          echo "Pushing Docker images..."
+          docker push $IMAGE_NAME:latest
+          docker push $IMAGE_NAME:$IMAGE_TAG
 
       - name: Deploy to GCP VM using SSH
+        env:
+          GCP_SA_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}
         run: |
           gcloud compute ssh backend-magnasight \
-  --zone=asia-southeast2-c \
-  --command="
-    sudo -i bash -c '
-    cd backend-magnasight-fastapi &&
+            --zone=asia-southeast2-c \
+            --command="
+              sudo -i bash -c '
+              cd backend-magnasight-fastapi || exit 1
 
-    echo \"Writing GCP credentials...\"
-    echo \"${{ secrets.GCP_CREDENTIALS_JSON }}\" > gcp-sa.json &&
+              echo \"Creating gcp-sa.json from secret...\"
+              echo \"$GCP_SA_JSON\" > gcp-sa.json
 
-    echo \"Pulling latest code...\"
-    git pull origin main &&
+              echo \"Pulling latest code...\"
+              git pull origin main || exit 1
 
-    echo \"Rebuilding containers...\"
-    docker compose down &&
-    docker compose pull &&
-    docker compose up -d
-  '"
+              echo \"Recreating containers...\"
+              docker compose down || exit 1
+              docker compose pull || exit 1
+              docker compose up -d || exit 1
 
+              echo \"Cleaning up gcp-sa.json...\"
+              rm -f gcp-sa.json
+            '"
