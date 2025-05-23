@@ -180,3 +180,11 @@ async def add_projects_to_group(group_id: str, project_ids: List[str] = Body(...
         "added": added,
         "skipped_existing": skipped
     }
+
+@router.delete('/{group_id}/projects/{project_id}')
+async def delete_project_from_group(group_id: str, project_id: str, db=Depends(get_db)):
+    query = 'DELETE FROM group_projects WHERE group_id = $1 AND project_id = $2'
+    result = await db.execute(query, group_id, project_id)
+    if result == 'DELETE 0':
+        raise HTTPException(status_code=404, detail='Project not found in the group')
+    return {'message': 'Project removed from group successfully'}
