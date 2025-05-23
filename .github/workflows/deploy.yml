@@ -22,6 +22,14 @@ jobs:
         with:
           project_id: dev-fairuz-agiza
 
+      - name: Write GCP credentials to file
+        run: echo "$GCP_CREDENTIALS_JSON" > ${{ github.workspace }}/gcp-sa.json
+        env:
+          GCP_CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}
+
+      - name: Set GOOGLE_APPLICATION_CREDENTIALS env
+        run: echo "GOOGLE_APPLICATION_CREDENTIALS=${{ github.workspace }}/gcp-sa.json" >> $GITHUB_ENV
+
       - name: Build and push Docker images
         run: |
             IMAGE_NAME=asia-southeast2-docker.pkg.dev/dev-fairuz-agiza/backend-repo/backend-magnasight-fastapi

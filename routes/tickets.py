@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from google.cloud import storage
 from pydantic import BaseModel
 from typing import List, Optional
 import asyncpg
 import os
 import random
+import json
 from datetime import datetime
 
 router = APIRouter()
@@ -59,45 +61,59 @@ def generate_ticket_id() -> str:
     random_string = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', k=6))
     return f"TICKET-{timestamp}-{random_string}"
 
+GCS_BUCKET_NAME = os.getenv('GCS_BUCKET_NAME', 'magnasight-attachment')
+
+# Fungsi upload file ke GCS
+def upload_file_to_gcs(file: UploadFile, destination_blob_name: str) -> str:
+    client = storage.Client()
+    bucket = client.bucket(GCS_BUCKET_NAME)
+    blob = bucket.blob(destination_blob_name)
+    blob.upload_from_file(file.file, content_type=file.content_type)
+    blob.make_public()
+    return blob.public_url
+
 # Endpoints
 @router.post('/', response_model=Ticket)
-async def create_ticket(ticket: TicketCreate, attachment: UploadFile = File(None), db=Depends(get_db)):
+async def create_ticket(ticket: str = Form(...), attachment: UploadFile = File(None), db=Depends(get_db)):
+    ticket_data = TicketCreate(**json.loads(ticket))
     company_query = 'SELECT company_name, limit_ticket FROM customers WHERE company_id = $1'
-    company = await db.fetchrow(company_query, ticket.company_id)
+    company = await db.fetchrow(company_query, ticket_data.company_id)
     if not company:
         raise HTTPException(status_code=404, detail='Company not found')
 
     ticket_count_query = 'SELECT COUNT(*) FROM tickets WHERE company_id = $1'
-    ticket_count = await db.fetchval(ticket_count_query, ticket.company_id)
+    ticket_count = await db.fetchval(ticket_count_query, ticket_data.company_id)
     if ticket_count >= company['limit_ticket']:
         raise HTTPException(status_code=403, detail='Ticket limit reached for this company')
 
     ticket_id = generate_ticket_id()
     attachment_url = None
     if attachment:
-        # Handle file upload locally or skip if not needed
-        attachment_url = f"/path/to/local/storage/{attachment.filename}"
+        # Upload ke GCS
+        ext = os.path.splitext(attachment.filename)[1]
+        gcs_filename = f"tickets/{ticket_id}{ext}"
+        attachment_url = upload_file_to_gcs(attachment, gcs_filename)
 
     ticket_query = '''
         INSERT INTO tickets (ticket_id, product_list, describe_issue, detail_issue, priority, contact, company_id, company_name, attachment, id_user, status) 
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     '''
-    await db.execute(ticket_query, ticket_id, ticket.product_list, ticket.describe_issue, ticket.detail_issue, ticket.priority, ticket.contact, ticket.company_id, company['company_name'], attachment_url, ticket.id_user, 'Open')
+    await db.execute(ticket_query, ticket_id, ticket_data.product_list, ticket_data.describe_issue, ticket_data.detail_issue, ticket_data.priority, ticket_data.contact, ticket_data.company_id, company['company_name'], attachment_url, ticket_data.id_user, 'Open')
 
     update_usage_query = 'UPDATE customers SET ticket_usage = ticket_usage + 1 WHERE company_id = $1'
-    await db.execute(update_usage_query, ticket.company_id)
+    await db.execute(update_usage_query, ticket_data.company_id)
 
     return {
         'ticket_id': ticket_id,
-        'product_list': ticket.product_list,
-        'describe_issue': ticket.describe_issue,
-        'detail_issue': ticket.detail_issue,
-        'priority': ticket.priority,
-        'contact': ticket.contact,
-        'company_id': ticket.company_id,
+        'product_list': ticket_data.product_list,
+        'describe_issue': ticket_data.describe_issue,
+        'detail_issue': ticket_data.detail_issue,
+        'priority': ticket_data.priority,
+        'contact': ticket_data.contact,
+        'company_id': ticket_data.company_id,
         'company_name': company['company_name'],
         'attachment': attachment_url,
-        'id_user': ticket.id_user,
+        'id_user': ticket_data.id_user,
         'status': 'Open'
     }
 

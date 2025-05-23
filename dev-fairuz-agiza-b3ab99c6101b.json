@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "dev-fairuz-agiza",
+  "private_key_id": "b3ab99c6101b7336326dadd540b7d75bb576cf9a",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC9xCjiB0Fb4fPj\nuYwxGLRHrE/oaVoqFYmgcIMAobnVtYk0d5wj4Fe7vDZeQi2Dt9JD9ULZoZMqIcWQ\noZUeBn3sFRvX539XXwBlAAau66AN4zmoGw8fjGuJTP/B+wmCGpaQyc4fT45mvG9v\n7zaUInOu3fT4XUawQ9qn19GMV9AYyeSiXpNDhQ9Okf/aU25GBupPKrfR2QvKH75z\nF4BH+UryVpPaqHxdBr2Jzy6YWTaqo5XumvodTC/w7qpMcDa/3jGcOL+RrEQCScmC\nICvHBUrJTZ9WNE8DJrAvdmg9GT6+PvY2UZ1nRWOiBYCv+CFGeJKxoaS91D2nwEXi\nFQC5MiHFAgMBAAECggEADb7Go1CZOFmOe+E1uVyrukFN7GytHj0/IcLkikgsmME0\ndftv8N1QHYYNfhhXCaJn9YovVGoyqauWjtpVXb5kopQI10OqYp67/ZTZ5xOkHT1n\nMLj9CHD4XRKZt+hCEQ1x+HzVlEkD7Icbn0T5dBNmw7TKCK9g7mWL0fp88ChwJ0tg\nX0eELV19TiqXUJg7NXmI5QLFuU9jCEvnqAwH4hVWyZqJdIHw2lg2sJBSRcvwBrlD\ndXc+CNvSxpxWxRhwv1JtX+cpM8QAF6jq9/2OVvwV1aotKSizglJdN+cAlPC3EOu1\nmhpC9pvYhMF7aHUfABP1Uq6ctAAByHf0avIINRsaoQKBgQDuo8IxizE/QLB6zKUi\ntYv/KFYxZlS9j5ktxFuwINEqY1PdTPDgeMCPEFLoMI3yTxsKTJSzb7f26jABYR5t\nzt5MjBB+7BGOEmtp2DgP8fwrxWEcsGFK5BZngH6nSpdvZ1pZfNd4wGyCoipMriZZ\nL+0pQW7WKA9AVGls/U8xcpIsSQKBgQDLkjhRtaYgNgJxvKZ8cJFw3ZzihqMUmIbk\nKruZ5PlgvKu5CCsNEqY6FMy+4EJ1jxLc6w9qwD77JYgr1bySikF9EhHdzKNLA7bB\njKYi0FImhmCFRa0625sDenuw/MqdCyKaJWVghQtLo15Lk8azlZph6Fr2kTOAWMzZ\nfgOalHsxnQKBgQCTOKXCCNwd6Ju3dm7eBeBTTqA2I6pds6xNZtklxGkl3FdNrHzi\nDrzExc5P/jxj41eMOAh41pBInNt2zmKGXdwYn0RB+QMvgb+QcdrMQ35NxpwNpeav\n3BzSR5xbOpJIIRvFH1aS4StQQBkWa02vMfj+vaZSKi6Wgjz0ByYHHGZ/OQKBgQCZ\nlUNwQf+HpbfKX22rzLGt2USXksROsZRzZ9oJjTqnxTA5dPQl9L/8adze1QrO7pZo\nnd8PxuK9T9+gUqzmUfB+j7dzAwTff3nOJHLjKRARiKghZCQBl9UnlqzjJpUmTlRY\nv4Xwf++5rRNjKaZrrp6+5zJZe8rDNju2it/lK8iV8QKBgHmIePX0u+khSuszJxv4\nU8NFXLRGrkCkidAeW6lYq5yeelzLtFjqkU+jLGViXdbFzAqtlG7Vi1awJ0+aXLgU\nSb06pDPed6ioZi4pBDKL7wSPxUVMWkC6iwa2nP0lM4f6TXsaiLx8Z9yRUVOBQ2Qz\nrJA7EjvORkkUaS1qyNmdj4Uf\n-----END PRIVATE KEY-----\n",
+  "client_email": "sa-gcs-magnasight@dev-fairuz-agiza.iam.gserviceaccount.com",
+  "client_id": "116083365851356697786",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/sa-gcs-magnasight%40dev-fairuz-agiza.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
