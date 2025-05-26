@@ -37,6 +37,7 @@ class Ticket(BaseModel):
     attachment: Optional[str]
     id_user: str
     status: str
+    created_at: Optional[datetime]
 
 class TicketCreate(BaseModel):
     product_list: str
