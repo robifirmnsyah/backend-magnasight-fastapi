@@ -98,7 +98,7 @@ async def create_ticket(ticket: str = Form(...), attachment: UploadFile = File(N
     if attachment:
         # Upload ke GCS
         ext = os.path.splitext(attachment.filename)[1]
-        gcs_filename = f"tickets/{ticket_id}{ext}"
+        gcs_filename = f"tickets/{company['company_name']}/{ticket_id}{ext}"
         attachment_url = upload_file_to_gcs(attachment, gcs_filename)
 
     ticket_query = '''
