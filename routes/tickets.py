@@ -101,6 +101,54 @@ async def send_ticket_email(to_email: str, subject: str, content: str):
         start_tls=True,
     )
 
+def build_ticket_email_html(ticket_id, company_name, product_list, describe_issue, detail_issue, priority, contact, status):
+    return f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; background: #f8f9fa; padding: 24px;">
+        <div style="max-width: 600px; margin: auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #e0e0e0; padding: 32px;">
+          <h2 style="color: #2d7ff9; margin-top: 0;">🎫 Tiket Baru Telah Dibuat</h2>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
+            <tr>
+              <td style="font-weight: bold; padding: 8px 0;">Ticket ID</td>
+              <td style="padding: 8px 0;">{ticket_id}</td>
+            </tr>
+            <tr>
+              <td style="font-weight: bold; padding: 8px 0;">Perusahaan</td>
+              <td style="padding: 8px 0;">{company_name}</td>
+            </tr>
+            <tr>
+              <td style="font-weight: bold; padding: 8px 0;">Produk</td>
+              <td style="padding: 8px 0;">{product_list}</td>
+            </tr>
+            <tr>
+              <td style="font-weight: bold; padding: 8px 0;">Prioritas</td>
+              <td style="padding: 8px 0;">{priority}</td>
+            </tr>
+            <tr>
+              <td style="font-weight: bold; padding: 8px 0;">Status</td>
+              <td style="padding: 8px 0;">{status}</td>
+            </tr>
+            <tr>
+              <td style="font-weight: bold; padding: 8px 0;">Contact</td>
+              <td style="padding: 8px 0;">{contact}</td>
+            </tr>
+          </table>
+          <div style="margin-top: 24px;">
+            <h4 style="margin-bottom: 8px; color: #333;">Deskripsi Masalah</h4>
+            <div style="background: #f1f3f4; border-radius: 4px; padding: 12px 16px; color: #444;">
+              <b>{describe_issue}</b><br>
+              <span>{detail_issue}</span>
+            </div>
+          </div>
+          <p style="margin-top: 32px; color: #888; font-size: 13px;">
+            Terima kasih telah menggunakan layanan support kami.<br>
+            MagnaSight Support Team
+          </p>
+        </div>
+      </body>
+    </html>
+    """
+
 # Endpoints
 @router.post('/', response_model=Ticket)
 async def create_ticket(ticket: str = Form(...), attachment: UploadFile = File(None), db=Depends(get_db)):
@@ -141,19 +189,28 @@ async def create_ticket(ticket: str = Form(...), attachment: UploadFile = File(N
 
     # Kirim email ke contact
     subject = f"Ticket Baru: {ticket_id}"
-    content = (
-        f"Ticket ID: {ticket_id}\n"
-        f"Nama Perusahaan: {company['company_name']}\n"
-        f"Produk: {ticket_data.product_list}\n"
-        f"Deskripsi: {ticket_data.describe_issue}\n"
-        f"Detail: {ticket_data.detail_issue}\n"
-        f"Prioritas: {ticket_data.priority}\n"
-        f"Contact: {ticket_data.contact}\n"
-        f"Status: Open\n"
+    html_content = build_ticket_email_html(
+        ticket_id, company['company_name'], ticket_data.product_list,
+        ticket_data.describe_issue, ticket_data.detail_issue,
+        ticket_data.priority, ticket_data.contact, "Open"
     )
-    # Kirim ke contact
-    await send_ticket_email(ticket_data.contact, subject, content)
-    # Kirim ke admin
+
+    message = EmailMessage()
+    message["From"] = ADMIN_EMAIL
+    message["To"] = ticket_data.contact
+    message["Subject"] = subject
+    message.set_content("Tiket baru telah dibuat.")  # fallback plain text
+    message.add_alternative(html_content, subtype="html")
+    await aiosmtplib.send(
+        message,
+        hostname=os.getenv("SMTP_HOST", "smtp.gmail.com"),
+        port=int(os.getenv("SMTP_PORT", 587)),
+        username=os.getenv("SMTP_USER"),
+        password=os.getenv("SMTP_PASS"),
+        start_tls=True,
+    )
+
+    # Kirim email ke admin
     await send_ticket_email(ADMIN_EMAIL, subject, content)
 
     return dict(result)
