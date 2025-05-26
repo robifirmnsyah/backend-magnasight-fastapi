@@ -6,6 +6,3 @@ dist/
 wheels/
 *.egg-info
 
-# Virtual environments
-.venv
-dev-fairuz-agiza*.json

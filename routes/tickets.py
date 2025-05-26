@@ -7,6 +7,8 @@ import os
 import random
 import json
 from datetime import datetime, timedelta
+from email.message import EmailMessage
+import aiosmtplib
 
 router = APIRouter()
 
@@ -80,6 +82,25 @@ def upload_file_to_gcs(file: UploadFile, destination_blob_name: str) -> str:
     )
     return url
 
+# Email configuration
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@email.com")  # set di .env atau environment
+
+async def send_ticket_email(to_email: str, subject: str, content: str):
+    message = EmailMessage()
+    message["From"] = ADMIN_EMAIL
+    message["To"] = to_email
+    message["Subject"] = subject
+    message.set_content(content)
+
+    await aiosmtplib.send(
+        message,
+        hostname=os.getenv("SMTP_HOST", "smtp.gmail.com"),
+        port=int(os.getenv("SMTP_PORT", 587)),
+        username=os.getenv("SMTP_USER"),
+        password=os.getenv("SMTP_PASS"),
+        start_tls=True,
+    )
+
 # Endpoints
 @router.post('/', response_model=Ticket)
 async def create_ticket(ticket: str = Form(...), attachment: UploadFile = File(None), db=Depends(get_db)):
@@ -112,6 +133,29 @@ async def create_ticket(ticket: str = Form(...), attachment: UploadFile = File(N
 
     # Ambil data ticket yang baru saja dibuat, termasuk created_at
     result = await db.fetchrow('SELECT * FROM tickets WHERE ticket_id = $1', ticket_id)
+
+    # Kirim email notifikasi setelah tiket berhasil dibuat
+    subject = "New Ticket Created"
+    content = f"Ticket ID: {ticket_id}\nPriority: {ticket_data.priority}\nStatus: Open"
+    await send_ticket_email("recipient@email.com", subject, content)  # Ganti dengan email penerima yang sesuai
+
+    # Kirim email ke contact
+    subject = f"Ticket Baru: {ticket_id}"
+    content = (
+        f"Ticket ID: {ticket_id}\n"
+        f"Nama Perusahaan: {company['company_name']}\n"
+        f"Produk: {ticket_data.product_list}\n"
+        f"Deskripsi: {ticket_data.describe_issue}\n"
+        f"Detail: {ticket_data.detail_issue}\n"
+        f"Prioritas: {ticket_data.priority}\n"
+        f"Contact: {ticket_data.contact}\n"
+        f"Status: Open\n"
+    )
+    # Kirim ke contact
+    await send_ticket_email(ticket_data.contact, subject, content)
+    # Kirim ke admin
+    await send_ticket_email(ADMIN_EMAIL, subject, content)
+
     return dict(result)
 
 @router.get('/', response_model=List[Ticket])
