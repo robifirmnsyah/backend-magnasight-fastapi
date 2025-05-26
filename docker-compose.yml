@@ -36,6 +36,11 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_PORT: 5432
       DB_NAME: ${DB_NAME}
+      ADMIN_EMAIL: admin@dev.magnaglobal.id
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: support@dev.magnaglobal.id
+      SMTP_PASS: oocdxcxzhmgcteqf
       GOOGLE_APPLICATION_CREDENTIALS: /gcp-sa.json
     volumes:
       - ./gcp-sa.json:/gcp-sa.json
