@@ -9,6 +9,7 @@ import json
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 import aiosmtplib
+from jinja2 import Environment, FileSystemLoader
 
 router = APIRouter()
 
@@ -101,53 +102,12 @@ async def send_ticket_email(to_email: str, subject: str, content: str):
         start_tls=True,
     )
 
-def build_ticket_email_html(ticket_id, company_name, product_list, describe_issue, detail_issue, priority, contact, status):
-    return f"""
-    <html>
-      <body style="font-family: Arial, sans-serif; background: #f8f9fa; padding: 24px;">
-        <div style="max-width: 600px; margin: auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #e0e0e0; padding: 32px;">
-          <h2 style="color: #2d7ff9; margin-top: 0;">🎫 Tiket Baru Telah Dibuat</h2>
-          <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
-            <tr>
-              <td style="font-weight: bold; padding: 8px 0;">Ticket ID</td>
-              <td style="padding: 8px 0;">{ticket_id}</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold; padding: 8px 0;">Perusahaan</td>
-              <td style="padding: 8px 0;">{company_name}</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold; padding: 8px 0;">Produk</td>
-              <td style="padding: 8px 0;">{product_list}</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold; padding: 8px 0;">Prioritas</td>
-              <td style="padding: 8px 0;">{priority}</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold; padding: 8px 0;">Status</td>
-              <td style="padding: 8px 0;">{status}</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold; padding: 8px 0;">Contact</td>
-              <td style="padding: 8px 0;">{contact}</td>
-            </tr>
-          </table>
-          <div style="margin-top: 24px;">
-            <h4 style="margin-bottom: 8px; color: #333;">Deskripsi Masalah</h4>
-            <div style="background: #f1f3f4; border-radius: 4px; padding: 12px 16px; color: #444;">
-              <b>{describe_issue}</b><br>
-              <span>{detail_issue}</span>
-            </div>
-          </div>
-          <p style="margin-top: 32px; color: #888; font-size: 13px;">
-            Terima kasih telah menggunakan layanan support kami.<br>
-            MagnaSight Support Team
-          </p>
-        </div>
-      </body>
-    </html>
-    """
+# Setup Jinja2 environment (letakkan di awal file)
+template_env = Environment(loader=FileSystemLoader('templates'))
+
+def build_ticket_email_html(**context):
+    template = template_env.get_template('ticket_email.html')
+    return template.render(**context)
 
 # Endpoints
 @router.post('/', response_model=Ticket)
@@ -190,9 +150,14 @@ async def create_ticket(ticket: str = Form(...), attachment: UploadFile = File(N
     # Kirim email ke contact
     subject = f"Ticket Baru: {ticket_id}"
     html_content = build_ticket_email_html(
-        ticket_id, company['company_name'], ticket_data.product_list,
-        ticket_data.describe_issue, ticket_data.detail_issue,
-        ticket_data.priority, ticket_data.contact, "Open"
+        ticket_id=ticket_id,
+        company_name=company['company_name'],
+        product_list=ticket_data.product_list,
+        describe_issue=ticket_data.describe_issue,
+        detail_issue=ticket_data.detail_issue,
+        priority=ticket_data.priority,
+        contact=ticket_data.contact,
+        status="Open"
     )
 
     message = EmailMessage()
