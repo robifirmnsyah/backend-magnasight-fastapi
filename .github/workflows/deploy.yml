@@ -12,6 +12,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Write credentials JSON to file
+        run: echo '${{ secrets.GCP_SA_KEY }}' > gcp-sa.json
+
+      - name: Set GOOGLE_APPLICATION_CREDENTIALS env var
+        run: echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/gcp-sa.json" >> $GITHUB_ENV
+
       - name: Set up gcloud CLI
         uses: google-github-actions/setup-gcloud@v2
         with:
