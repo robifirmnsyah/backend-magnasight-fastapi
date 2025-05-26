@@ -97,7 +97,6 @@ async def create_ticket(ticket: str = Form(...), attachment: UploadFile = File(N
     ticket_id = generate_ticket_id()
     attachment_url = None
     if attachment:
-        # Upload ke GCS
         ext = os.path.splitext(attachment.filename)[1]
         gcs_filename = f"tickets/{company['company_name']}/{ticket_id}{ext}"
         attachment_url = upload_file_to_gcs(attachment, gcs_filename)
@@ -111,19 +110,9 @@ async def create_ticket(ticket: str = Form(...), attachment: UploadFile = File(N
     update_usage_query = 'UPDATE customers SET ticket_usage = ticket_usage + 1 WHERE company_id = $1'
     await db.execute(update_usage_query, ticket_data.company_id)
 
-    return {
-        'ticket_id': ticket_id,
-        'product_list': ticket_data.product_list,
-        'describe_issue': ticket_data.describe_issue,
-        'detail_issue': ticket_data.detail_issue,
-        'priority': ticket_data.priority,
-        'contact': ticket_data.contact,
-        'company_id': ticket_data.company_id,
-        'company_name': company['company_name'],
-        'attachment': attachment_url,
-        'id_user': ticket_data.id_user,
-        'status': 'Open'
-    }
+    # Ambil data ticket yang baru saja dibuat, termasuk created_at
+    result = await db.fetchrow('SELECT * FROM tickets WHERE ticket_id = $1', ticket_id)
+    return dict(result)
 
 @router.get('/', response_model=List[Ticket])
 async def get_tickets(db=Depends(get_db)):
