@@ -32,6 +32,12 @@ jobs:
           docker push $IMAGE_NAME:latest
           docker push $IMAGE_NAME:$IMAGE_TAG
 
+      - name: Pull latest code from repository
+        run: |
+          cd ~/backend-magnasight-fastapi
+          echo "Pulling latest code from repository..."
+          git pull
+
       - name: Deploy containers
         run: |
           echo "Stopping old containers..."
