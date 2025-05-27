@@ -1,38 +1,208 @@
+<!DOCTYPE html>
 <html>
-  <body style="font-family: Arial, sans-serif; background: #f5f6fa; padding: 24px;">
-    <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 32px;">
-      <div style="display: flex; align-items: center;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MagnaSight Support Ticket</title>
+  <style>
+    /* Basic Reset */
+    body, table, td, p, h1, h2, h3 {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 14px;
+      color: #333333;
+    }
+    body {
+      background-color: #f5f6fa; /* Light grey-blue background from user example */
+      margin: 0;
+      padding: 24px; /* Padding from user example body */
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto; /* Centered, as per user example */
+      background-color: #ffffff; /* White background for the content area */
+      border-radius: 10px; /* Rounded corners from user example */
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* Shadow from user example */
+      overflow: hidden;
+    }
+    .header {
+      /* display: flex and align-items: center will be handled by inner elements */
+      padding: 32px 32px 0 32px; /* Padding from user example, adjusted for content flow */
+    }
+    .header-content {
+      display: flex;
+      align-items: center;
+    }
+    .header img {
+      max-height: 40px; /* Adjust as needed, original example doesn't specify */
+      vertical-align: middle; /* Good practice, though flex handles alignment */
+    }
+    .header-title {
+      color: #2473f1; /* Blue color from user example */
+      font-size: 20px; /* Approximating h2 style */
+      font-weight: bold;
+      margin: 0 0 0 15px; /* Margin to space from logo */
+    }
+    .content {
+      padding: 24px 32px 32px 32px; /* Padding from user example, top padding adjusted */
+    }
+    .greeting {
+      font-size: 16px; /* From user example */
+      margin-top: 0; /* Adjusted from original, as header has padding */
+      margin-bottom: 16px;
+      color: #333; /* From user example */
+    }
+    .message {
+      font-size: 16px; /* From user example */
+      line-height: 1.6;
+      margin-top: 0;
+      margin-bottom: 16px; /* Space between paragraphs */
+      color: #333; /* From user example */
+    }
+    .ticket-details {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 24px; /* From user example */
+      margin-bottom: 24px; /* Added for spacing before issue description */
+    }
+    .ticket-details td {
+      padding: 8px 0; /* From user example */
+      font-size: 14px; /* Consistent with base font size */
+      vertical-align: top;
+      border-bottom: 1px solid #eeeeee; /* Adding a light separator for readability */
+    }
+    .ticket-details td:last-child {
+        padding-left: 10px; /* Add some space between label and value */
+    }
+    .ticket-details tr:last-child td {
+        border-bottom: none; /* No border for the last item */
+    }
+    .ticket-details td.label {
+      font-weight: bold; /* From user example */
+      color: #555; /* From user example */
+      width: 150px; /* Fixed width for labels for alignment */
+    }
+    .ticket-details td.value {
+      color: #111; /* From user example */
+      text-align: left; /* Default, ensuring it's not right-aligned */
+    }
+    .issue-description-container {
+      margin-top: 24px; /* From user example */
+    }
+    .issue-description-box {
+      background: #f1f3f4; /* From user example */
+      border-radius: 6px; /* From user example */
+      padding: 16px; /* From user example */
+      color: #444; /* From user example */
+      font-size: 14px; /* Matching base font */
+    }
+    .issue-description-box strong {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+    }
+    .closing-message {
+      margin-top: 32px; /* From user example */
+      color: #888; /* From user example */
+      font-size: 13px; /* From user example */
+      line-height: 1.6;
+    }
+
+    /* Responsive adjustments */
+    @media screen and (max-width: 600px) {
+      body {
+        padding: 0; /* Remove body padding on small screens if container takes full width */
+      }
+      .container {
+        width: 100% !important;
+        margin: 0 auto !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+      }
+      .header {
+        padding: 20px 20px 0 20px !important;
+      }
+      .content {
+        padding: 20px !important;
+      }
+      .header-title {
+        font-size: 18px !important;
+      }
+      .ticket-details td.label {
+        width: 120px !important; /* Adjust label width for smaller screens */
+      }
+      .ticket-details td, .issue-description-box, .greeting, .message, .closing-message {
+        font-size: 14px !important; /* Slightly larger base font for mobile readability */
+      }
+       .ticket-details td.label, .ticket-details td.value {
+        /* Optional: stack them if needed, but side-by-side might still work with adjusted label width */
+        /* display: block;
+        width: 100% !important;
+        text-align: left !important; */
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-content">
         <img src="https://storage.googleapis.com/magnasight-attachment/logo.png" alt="Logo MagnaSight" />
-        <h2 style="color: #2473f1; margin: 0;">MagnaSight Support</h2>
+        <h2 class="header-title">MagnaSight Support</h2>
       </div>
+    </div>
 
-      <p style="margin-top: 24px; color: #333; font-size: 16px;">Hi {{ user_name }},</p>
+    <div class="content">
+      <p class="greeting">Hi {{ user_name }},</p>
 
-      <p style="margin: 0; color: #333; font-size: 16px;">Thank you for submitting a support ticket. Your request has been successfully received. Below are your ticket details:</p>
+      <p class="message">
+        Thank you for submitting a support ticket. Your request has been successfully received. Below are your ticket details:
+      </p>
 
-      <table style="width: 100%; border-collapse: collapse; margin-top: 24px;">
-        <tr><td style="font-weight: bold; padding: 8px 0; color: #555;">Created Time</td><td style="padding: 8px 0; color: #111;">{{ created_time }}</td></tr>
-        <tr><td style="font-weight: bold; padding: 8px 0; color: #555;">Ticket ID</td><td style="padding: 8px 0; color: #111;">{{ ticket_id }}</td></tr>
-        <tr><td style="font-weight: bold; padding: 8px 0; color: #555;">Company</td><td style="padding: 8px 0; color: #111;">{{ company_name }}</td></tr>
-        <tr><td style="font-weight: bold; padding: 8px 0; color: #555;">Product</td><td style="padding: 8px 0; color: #111;">{{ product_list }}</td></tr>
-        <tr><td style="font-weight: bold; padding: 8px 0; color: #555;">Priority</td><td style="padding: 8px 0; color: #111;">{{ priority }}</td></tr>
-        <tr><td style="font-weight: bold; padding: 8px 0; color: #555;">Status</td><td style="padding: 8px 0; color: #111;">{{ status }}</td></tr>
-        <tr><td style="font-weight: bold; padding: 8px 0; color: #555;">Issue</td><td style="padding: 8px 0; color: #111;">{{ describe_issue }}</td></tr>
-
+      <table class="ticket-details">
+        <tr>
+          <td class="label">Created Time</td>
+          <td class="value">{{ created_time }}</td>
+        </tr>
+        <tr>
+          <td class="label">Ticket ID</td>
+          <td class="value">{{ ticket_id }}</td>
+        </tr>
+        <tr>
+          <td class="label">Company</td>
+          <td class="value">{{ company_name }}</td>
+        </tr>
+        <tr>
+          <td class="label">Product</td>
+          <td class="value">{{ product_list }}</td>
+        </tr>
+        <tr>
+          <td class="label">Priority</td>
+          <td class="value">{{ priority }}</td>
+        </tr>
+        <tr>
+          <td class="label">Status</td>
+          <td class="value">{{ status }}</td>
+        </tr>
+        <tr>
+          <td class="label">Issue</td>
+          <td class="value">{{ describe_issue }}</td>
+        </tr>
       </table>
 
-      <div style="margin-top: 24px;">
-        <h4 style="margin-bottom: 8px; color: #333;">Issue Description</h4>
-        <div style="background: #f1f3f4; border-radius: 6px; padding: 16px; color: #444;">
-          <strong>Detail Issue</strong><br>
+      <div class="issue-description-container">
+        <div class="issue-description-box">
+          <strong>Issue Description</strong>
           <span>{{ detail_issue }}</span>
         </div>
       </div>
 
-      <p style="margin-top: 32px; color: #888; font-size: 13px;">
+      <p class="closing-message">
         Thank you for using our support service.<br>
         MagnaSight Support Team
       </p>
     </div>
-  </body>
+    </div>
+</body>
 </html>
