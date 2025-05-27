@@ -12,49 +12,102 @@
       color: #333333;
     }
     body {
-      background-color: #e9eef6; /* Lebih soft, biru muda */
+      background-color: #c6c6c6; /* Light grey-blue background from user example */
       margin: 0;
-      padding: 24px;
+      padding: 24px; /* Padding from user example body */
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
     .container {
       max-width: 600px;
-      margin: auto;
-      background-color: #fdfdfd; /* Putih sedikit krem */
-      border-radius: 12px;
-      box-shadow: 0 4px 24px rgba(36, 115, 241, 0.10); /* Biru transparan */
-      padding: 32px;
-      border: 1px solid #e3eaf5; /* Border tipis biru muda */
+      margin: auto; /* Centered, as per user example */
+      background-color: #ffffff; /* White background for the content area */
+      border-radius: 10px; /* Rounded corners from user example */
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* Shadow from user example */
+      overflow: hidden;
     }
-    h2 {
-      color: #18315b;
+    .header {
+      padding: 32px 32px 0 32px; /* Padding from user example, adjusted for content flow */
+    }
+    .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between; /* This will push logo to left and title to right */
+    }
+    .header img {
+      max-height: 40px; /* Adjust as needed, original example doesn't specify */
+      vertical-align: middle;
+    }
+    .header-title {
+      color: #192b49; /* Blue color from MagnaSight logo */
+      font-size: 20px; /* Approximating h2 style */
+      font-weight: bold;
+      margin: 0; /* Remove left margin as justify-content handles spacing */
+      text-align: right; /* Ensures text itself is right-aligned if it wraps */
+    }
+    .content {
+      padding: 24px 32px 32px 32px; /* Padding from user example, top padding adjusted */
+    }
+    .greeting {
+      font-size: 16px; /* From user example */
+      margin-top: 0; /* Adjusted from original, as header has padding */
+      margin-bottom: 16px;
+      color: #333; /* From user example */
+    }
+    .message {
+      font-size: 16px; /* From user example */
+      line-height: 1.6;
       margin-top: 0;
+      margin-bottom: 16px; /* Space between paragraphs */
+      color: #333; /* From user example */
     }
-    table {
+    .ticket-details {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 16px;
+      margin-top: 24px; /* From user example */
+      margin-bottom: 24px; /* Added for spacing before issue description */
     }
-    td {
-      padding: 8px 0;
+    .ticket-details td {
+      padding: 8px 0; /* From user example */
+      font-size: 14px; /* Consistent with base font size */
+      vertical-align: top;
+      border-bottom: 1px solid #eeeeee; /* Adding a light separator for readability */
     }
-    td:first-child {
-      font-weight: bold;
-      color: #555;
-      width: 120px;
+    .ticket-details td:last-child {
+        padding-left: 10px; /* Add some space between label and value */
+    }
+    .ticket-details tr:last-child td {
+        border-bottom: none; /* No border for the last item */
+    }
+    .ticket-details td.label {
+      font-weight: bold; /* From user example */
+      color: #555; /* From user example */
+      width: 150px; /* Fixed width for labels for alignment */
+    }
+    .ticket-details td.value {
+      color: #111; /* From user example */
+      text-align: left; /* Default, ensuring it's not right-aligned */
+    }
+    .issue-description-container {
+      margin-top: 24px; /* From user example */
     }
     .issue-description-box {
-      background: #f1f6fb;
-      border-radius: 6px;
-      padding: 12px 16px;
-      color: #444;
-      margin-top: 8px;
+      background: #f1f3f4; /* From user example */
+      border-radius: 6px; /* From user example */
+      padding: 16px; /* From user example */
+      color: #444; /* From user example */
+      font-size: 14px; /* Matching base font */
     }
-    .footer {
-      margin-top: 32px;
-      color: #888;
-      font-size: 13px;
+    .issue-description-box strong {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+    }
+    .closing-message {
+      margin-top: 32px; /* From user example */
+      color: #888; /* From user example */
+      font-size: 13px; /* From user example */
+      line-height: 1.6;
     }
 
     /* Responsive adjustments */
@@ -97,26 +150,63 @@
 </head>
 <body>
   <div class="container">
-    <h2>🎫 New Ticket Created</h2>
-    <table>
-      <tr><td>Ticket ID</td><td>{{ ticket_id }}</td></tr>
-      <tr><td>Company</td><td>{{ company_name }}</td></tr>
-      <tr><td>Product</td><td>{{ product_list }}</td></tr>
-      <tr><td>Priority</td><td>{{ priority }}</td></tr>
-      <tr><td>Status</td><td>{{ status }}</td></tr>
-      <tr><td>Contact</td><td>{{ contact }}</td></tr>
-    </table>
-    <div style="margin-top: 24px;">
-      <h4 style="margin-bottom: 8px; color: #333;">Issue Description</h4>
-      <div class="issue-description-box">
-        <b>{{ describe_issue }}</b><br>
-        <span>{{ detail_issue }}</span>
+    <div class="header">
+      <div class="header-content">
+        <img src="https://storage.googleapis.com/magnasight-attachment/logo.png" alt="Logo MagnaSight" />
+        <h2 class="header-title">MagnaSight Support</h2>
       </div>
     </div>
-    <div class="footer">
-      Thank you for using our support service.<br>
-      MagnaSight Support Team
+
+    <div class="content">
+      <p class="greeting">Hi {{ user_name }},</p>
+
+      <p class="message">
+        Thank you for submitting a support ticket. Your request has been successfully received. Below are your ticket details:
+      </p>
+
+      <table class="ticket-details">
+        <tr>
+          <td class="label">Created Time</td>
+          <td class="value">{{ created_time }}</td>
+        </tr>
+        <tr>
+          <td class="label">Ticket ID</td>
+          <td class="value">{{ ticket_id }}</td>
+        </tr>
+        <tr>
+          <td class="label">Company</td>
+          <td class="value">{{ company_name }}</td>
+        </tr>
+        <tr>
+          <td class="label">Product</td>
+          <td class="value">{{ product_list }}</td>
+        </tr>
+        <tr>
+          <td class="label">Priority</td>
+          <td class="value">{{ priority }}</td>
+        </tr>
+        <tr>
+          <td class="label">Status</td>
+          <td class="value">{{ status }}</td>
+        </tr>
+        <tr>
+          <td class="label">Issue</td>
+          <td class="value">{{ describe_issue }}</td>
+        </tr>
+      </table>
+
+      <div class="issue-description-container">
+        <div class="issue-description-box">
+          <strong>Issue Description</strong>
+          <span>{{ detail_issue }}</span>
+        </div>
+      </div>
+
+      <p class="closing-message">
+        Thank you for using our support service.<br>
+        MagnaSight Support Team
+      </p>
     </div>
-  </div>
+    </div>
 </body>
 </html>
