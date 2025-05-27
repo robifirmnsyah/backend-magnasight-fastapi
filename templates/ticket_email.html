@@ -1,22 +1,32 @@
 <html>
-  <body style="font-family: Arial, sans-serif; background: #f8f9fa; padding: 24px;">
-    <div style="max-width: 600px; margin: auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #e0e0e0; padding: 32px;">
-      <h2 style="color: #2d7ff9; margin-top: 0;">🎫 New Ticket Created</h2>
-      <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
-        <tr><td style="font-weight: bold; padding: 8px 0;">Ticket ID</td><td style="padding: 8px 0;">{{ ticket_id }}</td></tr>
-        <tr><td style="font-weight: bold; padding: 8px 0;">Company</td><td style="padding: 8px 0;">{{ company_name }}</td></tr>
-        <tr><td style="font-weight: bold; padding: 8px 0;">Product</td><td style="padding: 8px 0;">{{ product_list }}</td></tr>
-        <tr><td style="font-weight: bold; padding: 8px 0;">Priority</td><td style="padding: 8px 0;">{{ priority }}</td></tr>
-        <tr><td style="font-weight: bold; padding: 8px 0;">Status</td><td style="padding: 8px 0;">{{ status }}</td></tr>
-        <tr><td style="font-weight: bold; padding: 8px 0;">Contact</td><td style="padding: 8px 0;">{{ contact }}</td></tr>
+  <body style="font-family: Arial, sans-serif; background: #f5f6fa; padding: 24px;">
+    <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 32px;">
+      <div style="display: flex; align-items: center;">
+        <img src="https://www.google.com/url?sa=i&url=https%3A%2F%2Fcomputradetech.com%2Fid%2Fsubsidiaries-id%2Fsmartnet-magna-global-smg%2F&psig=AOvVaw1UyjNPFGAWc5bu-gZSWLro&ust=1748401340822000&source=images&cd=vfe&opi=89978449&ved=0CBQQjRxqFwoTCMiCvtzUwo0DFQAAAAAdAAAAABAE" alt="Logo" style="height: 40px; margin-right: 12px;">
+        <h2 style="color: #2473f1; margin: 0;">MagnaSight Support</h2>
+      </div>
+
+      <p style="margin-top: 24px; color: #333; font-size: 16px;">Hi {{ contact }},</p>
+
+      <p style="margin: 0; color: #333; font-size: 16px;">Thank you for submitting a support ticket. Your request has been successfully received. Below are your ticket details:</p>
+
+      <table style="width: 100%; border-collapse: collapse; margin-top: 24px;">
+        <tr><td style="font-weight: bold; padding: 8px 0; color: #555;">Created Time</td><td style="padding: 8px 0; color: #111;">{{ created_time }}</td></tr>
+        <tr><td style="font-weight: bold; padding: 8px 0; color: #555;">Ticket ID</td><td style="padding: 8px 0; color: #111;">{{ ticket_id }}</td></tr>
+        <tr><td style="font-weight: bold; padding: 8px 0; color: #555;">Company</td><td style="padding: 8px 0; color: #111;">{{ company_name }}</td></tr>
+        <tr><td style="font-weight: bold; padding: 8px 0; color: #555;">Product</td><td style="padding: 8px 0; color: #111;">{{ product_list }}</td></tr>
+        <tr><td style="font-weight: bold; padding: 8px 0; color: #555;">Priority</td><td style="padding: 8px 0; color: #111;">{{ priority }}</td></tr>
+        <tr><td style="font-weight: bold; padding: 8px 0; color: #555;">Status</td><td style="padding: 8px 0; color: #111;">{{ status }}</td></tr>
       </table>
+
       <div style="margin-top: 24px;">
         <h4 style="margin-bottom: 8px; color: #333;">Issue Description</h4>
-        <div style="background: #f1f3f4; border-radius: 4px; padding: 12px 16px; color: #444;">
-          <b>{{ describe_issue }}</b><br>
+        <div style="background: #f1f3f4; border-radius: 6px; padding: 16px; color: #444;">
+          <strong>{{ describe_issue }}</strong><br>
           <span>{{ detail_issue }}</span>
         </div>
       </div>
+
       <p style="margin-top: 32px; color: #888; font-size: 13px;">
         Thank you for using our support service.<br>
         MagnaSight Support Team
