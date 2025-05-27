@@ -12,7 +12,7 @@
       color: #333333;
     }
     body {
-      background-color: #c6c6c6; /* Light grey-blue background from user example */
+      background-color: #f5f6fa; /* Light grey-blue background from user example */
       margin: 0;
       padding: 24px; /* Padding from user example body */
       -webkit-font-smoothing: antialiased;
@@ -32,18 +32,19 @@
     .header-content {
       display: flex;
       align-items: center;
-      justify-content: space-between; /* This will push logo to left and title to right */
+      justify-content: space-between;
     }
     .header img {
-      max-height: 40px; /* Adjust as needed, original example doesn't specify */
+      max-height: 60px; /* Diperbesar */
       vertical-align: middle;
     }
     .header-title {
-      color: #192b49; /* Blue color from MagnaSight logo */
-      font-size: 20px; /* Approximating h2 style */
+      color: #192b49;
+      font-size: 22px;
       font-weight: bold;
-      margin: 0; /* Remove left margin as justify-content handles spacing */
-      text-align: right; /* Ensures text itself is right-aligned if it wraps */
+      margin: 0;
+      flex: 1;
+      text-align: right; /* Rata kanan */
     }
     .content {
       padding: 24px 32px 32px 32px; /* Padding from user example, top padding adjusted */
@@ -148,7 +149,7 @@
     }
   </style>
 </head>
-<body>
+<body style="font-family: Arial, sans-serif; background: #f5f6fa; padding: 24px;">
   <div class="container">
     <div class="header">
       <div class="header-content">

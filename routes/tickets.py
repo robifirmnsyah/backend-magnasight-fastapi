@@ -92,7 +92,7 @@ async def send_ticket_email(to_email: str, subject: str, content: str, is_html: 
     message["To"] = to_email
     message["Subject"] = subject
     if is_html:
-        message.set_content("New ticket created.")  # fallback plain text
+        message.set_content("New ticket created")  # fallback plain text
         message.add_alternative(content, subtype="html")
     else:
         message.set_content(content)
