@@ -129,7 +129,12 @@
         /* On small screens, you might want them stacked or ensure title doesn't get too squished */
       }
       .header-title {
-        font-size: 18px !important;
+        color: #192b49;
+        font-size: 22px;
+        font-weight: bold;
+        margin: 0;
+        flex: 1;
+        text-align: right;
       }
       .content {
         padding: 20px !important;
@@ -138,13 +143,10 @@
         width: 100px !important; /* Adjust label width for smaller screens, or stack them */
       }
       .ticket-details td, .issue-description-box, .greeting, .message, .closing-message {
-        font-size: 14px !important; /* Slightly larger base font for mobile readability */
+        font-size: 14px !important; 
       }
-       .ticket-details td.label, .ticket-details td.value {
-        /* Optional: stack them if needed */
-        /* display: block;
-        width: 100% !important;
-        text-align: left !important; */
+      .closing-message {
+        margin-top: 30px !important; /* Adjusted for smaller screens */
       }
     }
   </style>
@@ -154,7 +156,7 @@
     <div class="header">
       <div class="header-content">
         <img src="https://storage.googleapis.com/magnasight-attachment/logo.png" alt="Logo MagnaSight" />
-        <h2 class="header-title">MagnaSight Support</h2>
+        <h2 class="header-title" style="text-align: right">MagnaSight Support</h2>
       </div>
     </div>
 
@@ -194,14 +196,11 @@
           <td class="label">Issue</td>
           <td class="value">{{ describe_issue }}</td>
         </tr>
+        <tr>
+          <td class="label">Issue Description</td>
+          <td class="value">{{ detail_issue }}</td>
+        </tr>
       </table>
-
-      <div class="issue-description-container">
-        <div class="issue-description-box">
-          <strong>Issue Description</strong>
-          <span>{{ detail_issue }}</span>
-        </div>
-      </div>
 
       <p class="closing-message">
         Thank you for using our support service.<br>
