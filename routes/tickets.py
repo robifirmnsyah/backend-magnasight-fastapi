@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, BackgroundTasks
 from google.cloud import storage
 from pydantic import BaseModel
 from typing import List, Optional
@@ -86,12 +86,16 @@ def upload_file_to_gcs(file: UploadFile, destination_blob_name: str) -> str:
 # Email configuration
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@email.com")  # set di .env atau environment
 
-async def send_ticket_email(to_email: str, subject: str, content: str):
+async def send_ticket_email(to_email: str, subject: str, content: str, is_html: bool = False):
     message = EmailMessage()
     message["From"] = ADMIN_EMAIL
     message["To"] = to_email
     message["Subject"] = subject
-    message.set_content(content)
+    if is_html:
+        message.set_content("New ticket created.")  # fallback plain text
+        message.add_alternative(content, subtype="html")
+    else:
+        message.set_content(content)
 
     await aiosmtplib.send(
         message,
@@ -111,7 +115,12 @@ def build_ticket_email_html(**context):
 
 # Endpoints
 @router.post('/', response_model=Ticket)
-async def create_ticket(ticket: str = Form(...), attachment: UploadFile = File(None), db=Depends(get_db)):
+async def create_ticket(
+    ticket: str = Form(...),
+    attachment: UploadFile = File(None),
+    db=Depends(get_db),
+    background_tasks: BackgroundTasks = Depends()
+):
     ticket_data = TicketCreate(**json.loads(ticket))
     company_query = 'SELECT company_name, limit_ticket FROM customers WHERE company_id = $1'
     company = await db.fetchrow(company_query, ticket_data.company_id)
@@ -142,13 +151,13 @@ async def create_ticket(ticket: str = Form(...), attachment: UploadFile = File(N
     # Ambil data ticket yang baru saja dibuat, termasuk created_at
     result = await db.fetchrow('SELECT * FROM tickets WHERE ticket_id = $1', ticket_id)
 
-    # Kirim email notifikasi setelah tiket berhasil dibuat
+    user_query = 'SELECT full_name FROM users WHERE id_user = $1'
+    user = await db.fetchrow(user_query, ticket_data.id_user)
+    user_name = user['full_name'] if user else ticket_data.id_user
+
+    # Kirim email di background
     subject = "New Ticket Created"
     content = f"Ticket ID: {ticket_id}\nPriority: {ticket_data.priority}\nStatus: Open"
-    await send_ticket_email("recipient@email.com", subject, content)  # Ganti dengan email penerima yang sesuai
-
-    # Kirim email ke contact
-    subject = f"Ticket Baru: {ticket_id}"
     html_content = build_ticket_email_html(
         ticket_id=ticket_id,
         company_name=company['company_name'],
@@ -157,26 +166,13 @@ async def create_ticket(ticket: str = Form(...), attachment: UploadFile = File(N
         detail_issue=ticket_data.detail_issue,
         priority=ticket_data.priority,
         contact=ticket_data.contact,
-        status="Open"
+        status="Open",
+        created_time=result['created_at'].strftime("%Y-%m-%d %H:%M:%S") if result.get('created_at') else "",
+        user_name=user_name
     )
 
-    message = EmailMessage()
-    message["From"] = ADMIN_EMAIL
-    message["To"] = ticket_data.contact
-    message["Subject"] = subject
-    message.set_content("Tiket baru telah dibuat.")  # fallback plain text
-    message.add_alternative(html_content, subtype="html")
-    await aiosmtplib.send(
-        message,
-        hostname=os.getenv("SMTP_HOST", "smtp.gmail.com"),
-        port=int(os.getenv("SMTP_PORT", 587)),
-        username=os.getenv("SMTP_USER"),
-        password=os.getenv("SMTP_PASS"),
-        start_tls=True,
-    )
-
-    # Kirim email ke admin
-    await send_ticket_email(ADMIN_EMAIL, subject, content)
+    background_tasks.add_task(send_ticket_email, ticket_data.contact, subject, html_content, True)
+    background_tasks.add_task(send_ticket_email, ADMIN_EMAIL, subject, content, False)
 
     return dict(result)
 
