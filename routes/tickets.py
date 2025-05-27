@@ -116,10 +116,10 @@ def build_ticket_email_html(**context):
 # Endpoints
 @router.post('/', response_model=Ticket)
 async def create_ticket(
+    background_tasks: BackgroundTasks,
     ticket: str = Form(...),
     attachment: UploadFile = File(None),
     db=Depends(get_db),
-    background_tasks: BackgroundTasks = Depends()
 ):
     ticket_data = TicketCreate(**json.loads(ticket))
     company_query = 'SELECT company_name, limit_ticket FROM customers WHERE company_id = $1'
