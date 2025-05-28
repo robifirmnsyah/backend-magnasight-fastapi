@@ -61,6 +61,10 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+class UserProject(BaseModel):
+    id_user: str
+    project_id: str
+
 # Helper function to generate unique ID
 def generate_unique_id(prefix: str) -> str:
     random_string = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -197,3 +201,49 @@ async def delete_user(id_user: str, db=Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to delete user: {str(e)}')
+
+@router.post('/project')
+async def add_user_to_project(user_project: UserProject, db=Depends(get_db)):
+    try:
+        check_query = 'SELECT 1 FROM user_projects WHERE id_user = $1 AND project_id = $2'
+        exists = await db.fetchrow(check_query, user_project.id_user, user_project.project_id)
+        if exists:
+            raise HTTPException(status_code=400, detail='User already assigned to this project')
+        query = 'INSERT INTO user_projects (id_user, project_id) VALUES ($1, $2)'
+        await db.execute(query, user_project.id_user, user_project.project_id)
+        return {'message': 'User added to project'}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to add user to project: {str(e)}')
+
+@router.get('/project/{id_user}', response_model=List[str])
+async def get_projects_for_user(id_user: str, db=Depends(get_db)):
+    try:
+        query = 'SELECT project_id FROM user_projects WHERE id_user = $1'
+        results = await db.fetch(query, id_user)
+        return [row['project_id'] for row in results]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to get projects for user: {str(e)}')
+
+@router.get('/project/project/{project_id}', response_model=List[str])
+async def get_users_for_project(project_id: str, db=Depends(get_db)):
+    try:
+        query = 'SELECT id_user FROM user_projects WHERE project_id = $1'
+        results = await db.fetch(query, project_id)
+        return [row['id_user'] for row in results]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to get users for project: {str(e)}')
+
+@router.delete('/project')
+async def remove_user_from_project(user_project: UserProject, db=Depends(get_db)):
+    try:
+        query = 'DELETE FROM user_projects WHERE id_user = $1 AND project_id = $2'
+        result = await db.execute(query, user_project.id_user, user_project.project_id)
+        if result == 'DELETE 0':
+            raise HTTPException(status_code=404, detail='User-project relation not found')
+        return {'message': 'User removed from project'}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to remove user from project: {str(e)}')
