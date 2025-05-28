@@ -46,90 +46,117 @@ def generate_project_id() -> str:
 # Endpoints
 @router.post('/')
 async def create_project(project: ProjectCreate, db=Depends(get_db)):
-    project_id = generate_project_id()
-    
-    # Fetch billing_account_id from customers table
-    company_query = 'SELECT billing_account_id FROM customers WHERE company_id = $1'
-    company = await db.fetchrow(company_query, project.company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail='Company not found')
-    
-    billing_account_id = company['billing_account_id']
-    
-    query = '''
-        INSERT INTO projects (project_id, project_name, company_id, billing_account_id) 
-        VALUES ($1, $2, $3, $4)
-    '''
-    await db.execute(query, project_id, project.project_name, project.company_id, billing_account_id)
-    return {'message': 'Project created successfully', 'project_id': project_id}
+    try:
+        project_id = generate_project_id()
+        company_query = 'SELECT billing_account_id FROM customers WHERE company_id = $1'
+        company = await db.fetchrow(company_query, project.company_id)
+        if not company:
+            raise HTTPException(status_code=404, detail='Company not found')
+        billing_account_id = company['billing_account_id']
+        query = '''
+            INSERT INTO projects (project_id, project_name, company_id, billing_account_id) 
+            VALUES ($1, $2, $3, $4)
+        '''
+        await db.execute(query, project_id, project.project_name, project.company_id, billing_account_id)
+        return {'message': 'Project created successfully', 'project_id': project_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to create project: {str(e)}')
 
 @router.get('/', response_model=List[Project])
 async def get_projects(db=Depends(get_db)):
-    query = 'SELECT project_id, project_name, company_id, billing_account_id FROM projects'
-    results = await db.fetch(query)
-    return [dict(result) for result in results]
+    try:
+        query = 'SELECT project_id, project_name, company_id, billing_account_id FROM projects'
+        results = await db.fetch(query)
+        return [dict(result) for result in results]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to get projects: {str(e)}')
 
 @router.get('/{project_id}', response_model=Project)
 async def get_project(project_id: str, db=Depends(get_db)):
-    query = 'SELECT project_id, project_name, company_id, billing_account_id FROM projects WHERE project_id = $1'
-    result = await db.fetchrow(query, project_id)
-    if not result:
-        raise HTTPException(status_code=404, detail='Project not found')
-    return dict(result)
+    try:
+        query = 'SELECT project_id, project_name, company_id, billing_account_id FROM projects WHERE project_id = $1'
+        result = await db.fetchrow(query, project_id)
+        if not result:
+            raise HTTPException(status_code=404, detail='Project not found')
+        return dict(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to get project: {str(e)}')
 
 @router.get('/company/{company_id}', response_model=List[Project])
 async def get_projects_by_company_id(company_id: str, db=Depends(get_db)):
-    query = 'SELECT project_id, project_name, company_id, billing_account_id FROM projects WHERE company_id = $1'
-    results = await db.fetch(query, company_id)
-    if not results:
-        raise HTTPException(status_code=404, detail='No projects found for this company')
-    return [dict(result) for result in results]
+    try:
+        query = 'SELECT project_id, project_name, company_id, billing_account_id FROM projects WHERE company_id = $1'
+        results = await db.fetch(query, company_id)
+        if not results:
+            raise HTTPException(status_code=404, detail='No projects found for this company')
+        return [dict(result) for result in results]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to get projects by company: {str(e)}')
 
 @router.put('/{project_id}')
 async def update_project(project_id: str, project: ProjectCreate, db=Depends(get_db)):
-    # Fetch billing_account_id from customers table
-    company_query = 'SELECT billing_account_id FROM customers WHERE company_id = $1'
-    company = await db.fetchrow(company_query, project.company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail='Company not found')
-    
-    billing_account_id = company['billing_account_id']
-    
-    query = '''
-        UPDATE projects 
-        SET project_name = $1, company_id = $2, billing_account_id = $3 
-        WHERE project_id = $4
-    '''
-    result = await db.execute(query, project.project_name, project.company_id, billing_account_id, project_id)
-    if result == 'UPDATE 0':
-        raise HTTPException(status_code=404, detail='Project not found')
-    return {'message': 'Project updated successfully'}
+    try:
+        company_query = 'SELECT billing_account_id FROM customers WHERE company_id = $1'
+        company = await db.fetchrow(company_query, project.company_id)
+        if not company:
+            raise HTTPException(status_code=404, detail='Company not found')
+        billing_account_id = company['billing_account_id']
+        query = '''
+            UPDATE projects 
+            SET project_name = $1, company_id = $2, billing_account_id = $3 
+            WHERE project_id = $4
+        '''
+        result = await db.execute(query, project.project_name, project.company_id, billing_account_id, project_id)
+        if result == 'UPDATE 0':
+            raise HTTPException(status_code=404, detail='Project not found')
+        return {'message': 'Project updated successfully'}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to update project: {str(e)}')
 
 @router.delete('/{project_id}')
 async def delete_project(project_id: str, db=Depends(get_db)):
-    query = 'DELETE FROM projects WHERE project_id = $1'
-    result = await db.execute(query, project_id)
-    if result == 'DELETE 0':
-        raise HTTPException(status_code=404, detail='Project not found')
-    return {'message': 'Project deleted successfully'}
+    try:
+        query = 'DELETE FROM projects WHERE project_id = $1'
+        result = await db.execute(query, project_id)
+        if result == 'DELETE 0':
+            raise HTTPException(status_code=404, detail='Project not found')
+        return {'message': 'Project deleted successfully'}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to delete project: {str(e)}')
 
 @router.get('/group/{group_id}/projects', response_model=List[str])
 async def get_projects_by_group(group_id: str, db=Depends(get_db)):
-    query = '''
-        SELECT project_id
-        FROM group_projects
-        WHERE group_id = $1
-    '''
-    results = await db.fetch(query, group_id)
-    return [record['project_id'] for record in results]
+    try:
+        query = '''
+            SELECT project_id
+            FROM group_projects
+            WHERE group_id = $1
+        '''
+        results = await db.fetch(query, group_id)
+        return [record['project_id'] for record in results]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to get projects by group: {str(e)}')
 
 @router.get('/user/{id_user}/projects', response_model=List[str])
 async def get_project_ids_for_user(id_user: str, db=Depends(get_db)):
-    query = '''
-        SELECT gp.project_id
-        FROM group_projects gp
-        JOIN user_groups ug ON gp.group_id = ug.group_id
-        WHERE ug.id_user = $1
-    '''
-    results = await db.fetch(query, id_user)
-    return [record['project_id'] for record in results]
+    try:
+        query = '''
+            SELECT gp.project_id
+            FROM group_projects gp
+            JOIN user_groups ug ON gp.group_id = ug.group_id
+            WHERE ug.id_user = $1
+        '''
+        results = await db.fetch(query, id_user)
+        return [record['project_id'] for record in results]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to get projects for user: {str(e)}')

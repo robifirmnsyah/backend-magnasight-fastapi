@@ -69,110 +69,131 @@ def generate_unique_id(prefix: str) -> str:
 # Endpoints
 @router.post('/login')
 async def login(user: UserLogin, db=Depends(get_db)):
-    query = 'SELECT * FROM users WHERE username = $1'
-    result = await db.fetchrow(query, user.username)
-    if not result:
-        raise HTTPException(status_code=401, detail='Invalid username or password')
-
-    user_data = dict(result)
-    if not bcrypt.checkpw(user.password.encode('utf-8'), user_data['password'].encode('utf-8')):
-        raise HTTPException(status_code=401, detail='Invalid username or password')
-
-    expiration = datetime.utcnow() + timedelta(hours=1)
-    token = jwt.encode({
-        'id_user': user_data['id_user'],
-        'username': user_data['username'],
-        'role': user_data['role'],
-        'exp': expiration
-    }, SECRET_KEY, algorithm='HS256')
-
-    # Rename 'billing_id' to 'billing_account_id' in the response
-    user_data['billing_account_id'] = user_data.pop('billing_account_id')
-
-    return {
-        'message': 'Login successful',
-        'token': token,
-        'user': {k: v for k, v in user_data.items() if k != 'password'}
-    }
+    try:
+        query = 'SELECT * FROM users WHERE username = $1'
+        result = await db.fetchrow(query, user.username)
+        if not result:
+            raise HTTPException(status_code=401, detail='Invalid username or password')
+        user_data = dict(result)
+        if not bcrypt.checkpw(user.password.encode('utf-8'), user_data['password'].encode('utf-8')):
+            raise HTTPException(status_code=401, detail='Invalid username or password')
+        expiration = datetime.utcnow() + timedelta(hours=1)
+        token = jwt.encode({
+            'id_user': user_data['id_user'],
+            'username': user_data['username'],
+            'role': user_data['role'],
+            'exp': expiration
+        }, SECRET_KEY, algorithm='HS256')
+        user_data['billing_account_id'] = user_data.pop('billing_account_id')
+        return {
+            'message': 'Login successful',
+            'token': token,
+            'user': {k: v for k, v in user_data.items() if k != 'password'}
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to login: {str(e)}')
 
 @router.post('/')
 async def register(user: UserCreate, db=Depends(get_db)):
-    # Cek apakah username sudah dipakai
-    username_check = await db.fetchrow('SELECT 1 FROM users WHERE username = $1', user.username)
-    if username_check:
-        raise HTTPException(status_code=400, detail='Username already exists')
-    id_user = generate_unique_id('USER')
-    hashed_password = bcrypt.hashpw(user.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    company_query = 'SELECT company_name, billing_account_id FROM customers WHERE company_id = $1'
-    company = await db.fetchrow(company_query, user.company_id)
-    if not company:
-        raise HTTPException(status_code=404, detail='Company not found')
-    user_query = '''
-        INSERT INTO users (id_user, role, full_name, username, password, company_id, company_name, billing_account_id, email, phone) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-    '''
     try:
+        username_check = await db.fetchrow('SELECT 1 FROM users WHERE username = $1', user.username)
+        if username_check:
+            raise HTTPException(status_code=400, detail='Username already exists')
+        id_user = generate_unique_id('USER')
+        hashed_password = bcrypt.hashpw(user.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        company_query = 'SELECT company_name, billing_account_id FROM customers WHERE company_id = $1'
+        company = await db.fetchrow(company_query, user.company_id)
+        if not company:
+            raise HTTPException(status_code=404, detail='Company not found')
+        user_query = '''
+            INSERT INTO users (id_user, role, full_name, username, password, company_id, company_name, billing_account_id, email, phone) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        '''
         await db.execute(user_query, id_user, user.role, user.full_name, user.username, hashed_password, user.company_id, company['company_name'], company['billing_account_id'], user.email, user.phone)
+        return {'message': 'User registered successfully', 'id_user': id_user}
+    except HTTPException:
+        raise
     except asyncpg.exceptions.StringDataRightTruncationError as e:
-        print(id_user, user.role, user.full_name, user.username, hashed_password, user.company_id, company['company_name'], company['billing_account_id'], user.email, user.phone)
         raise HTTPException(status_code=400, detail='Invalid data provided')
-    return {'message': 'User registered successfully', 'id_user': id_user}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to register user: {str(e)}')
 
 @router.get('/', response_model=List[User])
 async def get_users(db=Depends(get_db)):
-    query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_account_id, email, phone FROM users'
-    results = await db.fetch(query)
-    return [dict(result) for result in results]
+    try:
+        query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_account_id, email, phone FROM users'
+        results = await db.fetch(query)
+        return [dict(result) for result in results]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to get users: {str(e)}')
 
 @router.get('/{id_user}', response_model=List[User])
 async def get_users_by_role(id_user: str, db=Depends(get_db)):
-    user_query = 'SELECT company_id FROM users WHERE id_user = $1'
-    user = await db.fetchrow(user_query, id_user)
-    if not user:
-        raise HTTPException(status_code=404, detail='User not found')
-
-    query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_account_id, email, phone FROM users WHERE company_id = $1'
-    results = await db.fetch(query, user['company_id'])
-
-    return [dict(result) for result in results]
+    try:
+        user_query = 'SELECT company_id FROM users WHERE id_user = $1'
+        user = await db.fetchrow(user_query, id_user)
+        if not user:
+            raise HTTPException(status_code=404, detail='User not found')
+        query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_account_id, email, phone FROM users WHERE company_id = $1'
+        results = await db.fetch(query, user['company_id'])
+        return [dict(result) for result in results]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to get users by role: {str(e)}')
 
 @router.get('/company/{company_id}', response_model=List[User])
 async def get_users_by_company_id(company_id: str, db=Depends(get_db)):
-    query = '''
-        SELECT id_user, role, full_name, username, company_id, company_name, billing_account_id, email, phone 
-        FROM users 
-        WHERE company_id = $1
-    '''
-    results = await db.fetch(query, company_id)
-    if not results:
-        raise HTTPException(status_code=404, detail='No users found for the given company ID')
-    return [dict(result) for result in results]
+    try:
+        query = '''
+            SELECT id_user, role, full_name, username, company_id, company_name, billing_account_id, email, phone 
+            FROM users 
+            WHERE company_id = $1
+        '''
+        results = await db.fetch(query, company_id)
+        if not results:
+            raise HTTPException(status_code=404, detail='No users found for the given company ID')
+        return [dict(result) for result in results]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to get users by company: {str(e)}')
 
 @router.put('/{id_user}')
 async def update_user(id_user: str, user: UserUpdate, db=Depends(get_db)):
-    update_data = user.dict(exclude_unset=True)
-    if 'username' in update_data:
-        # Cek apakah username sudah dipakai user lain
-        username_check = await db.fetchrow('SELECT 1 FROM users WHERE username = $1 AND id_user != $2', update_data['username'], id_user)
-        if username_check:
-            raise HTTPException(status_code=400, detail='Username already exists')
-    if 'password' in update_data:
-        update_data['password'] = bcrypt.hashpw(update_data['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    set_clause = ', '.join([f"{key} = ${i+1}" for i, key in enumerate(update_data.keys())])
-    values = list(update_data.values()) + [id_user]
-    query = f"UPDATE users SET {set_clause} WHERE id_user = ${len(values)}"
-    result = await db.execute(query, *values)
-    if result == 'UPDATE 0':
-        raise HTTPException(status_code=404, detail='User not found')
-    return {'message': 'User updated successfully'}
+    try:
+        update_data = user.dict(exclude_unset=True)
+        if 'username' in update_data:
+            username_check = await db.fetchrow('SELECT 1 FROM users WHERE username = $1 AND id_user != $2', update_data['username'], id_user)
+            if username_check:
+                raise HTTPException(status_code=400, detail='Username already exists')
+        if 'password' in update_data:
+            update_data['password'] = bcrypt.hashpw(update_data['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        set_clause = ', '.join([f"{key} = ${i+1}" for i, key in enumerate(update_data.keys())])
+        values = list(update_data.values()) + [id_user]
+        query = f"UPDATE users SET {set_clause} WHERE id_user = ${len(values)}"
+        result = await db.execute(query, *values)
+        if result == 'UPDATE 0':
+            raise HTTPException(status_code=404, detail='User not found')
+        return {'message': 'User updated successfully'}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to update user: {str(e)}')
 
 @router.delete('/{id_user}')
 async def delete_user(id_user: str, db=Depends(get_db)):
-    delete_comments_query = 'DELETE FROM ticket_comments WHERE id_user = $1'
-    await db.execute(delete_comments_query, id_user)
-
-    delete_user_query = 'DELETE FROM users WHERE id_user = $1'
-    result = await db.execute(delete_user_query, id_user)
-    if result == 'DELETE 0':
-        raise HTTPException(status_code=404, detail='User not found')
-    return {'message': 'User and related comments deleted successfully'}
+    try:
+        delete_comments_query = 'DELETE FROM ticket_comments WHERE id_user = $1'
+        await db.execute(delete_comments_query, id_user)
+        delete_user_query = 'DELETE FROM users WHERE id_user = $1'
+        result = await db.execute(delete_user_query, id_user)
+        if result == 'DELETE 0':
+            raise HTTPException(status_code=404, detail='User not found')
+        return {'message': 'User and related comments deleted successfully'}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to delete user: {str(e)}')

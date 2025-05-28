@@ -28,13 +28,26 @@ class Service(BaseModel):
 # Endpoints
 @router.get('/', response_model=List[Service])
 async def get_services(db=Depends(get_db)):
-    query = 'SELECT id, service_name FROM services'
     try:
+        query = 'SELECT id, service_name FROM services'
         results = await db.fetch(query)
-    except asyncpg.exceptions.PostgresError as err:
-        raise HTTPException(status_code=500, detail=f"Database error: {err}")
+        if not results:
+            raise HTTPException(status_code=404, detail="No services found")
+        return [dict(result) for result in results]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get services: {str(e)}")
 
-    if not results:
-        raise HTTPException(status_code=404, detail="No services found")
-
-    return [dict(result) for result in results]
+@router.get('/{service_id}', response_model=Service)
+async def get_service(service_id: int, db=Depends(get_db)):
+    try:
+        query = 'SELECT id, service_name FROM services WHERE id = $1'
+        result = await db.fetchrow(query, service_id)
+        if not result:
+            raise HTTPException(status_code=404, detail='Service not found')
+        return dict(result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to get service: {str(e)}')
