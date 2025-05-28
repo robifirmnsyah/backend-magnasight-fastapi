@@ -203,6 +203,15 @@ async def add_projects_to_group(group_id: str, project_ids: List[str] = Body(...
             insert_query = 'INSERT INTO group_projects (group_id, project_id) VALUES ($1, $2)'
             await db.execute(insert_query, group_id, project_id)
             added.append(project_id)
+            # Ambil semua user di grup
+            user_query = 'SELECT id_user FROM user_groups WHERE group_id = $1'
+            users = await db.fetch(user_query, group_id)
+            for user in users:
+                # Cek apakah user sudah punya akses ke project ini
+                check_user_project = 'SELECT 1 FROM user_projects WHERE id_user = $1 AND project_id = $2'
+                exists_user_project = await db.fetchrow(check_user_project, user['id_user'], project_id)
+                if not exists_user_project:
+                    await db.execute('INSERT INTO user_projects (id_user, project_id) VALUES ($1, $2)', user['id_user'], project_id)
         return {
             "message": "Finished processing projects",
             "added": added,
