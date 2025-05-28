@@ -97,14 +97,16 @@ async def login(user: UserLogin, db=Depends(get_db)):
 
 @router.post('/')
 async def register(user: UserCreate, db=Depends(get_db)):
+    # Cek apakah username sudah dipakai
+    username_check = await db.fetchrow('SELECT 1 FROM users WHERE username = $1', user.username)
+    if username_check:
+        raise HTTPException(status_code=400, detail='Username already exists')
     id_user = generate_unique_id('USER')
     hashed_password = bcrypt.hashpw(user.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
     company_query = 'SELECT company_name, billing_account_id FROM customers WHERE company_id = $1'
     company = await db.fetchrow(company_query, user.company_id)
     if not company:
         raise HTTPException(status_code=404, detail='Company not found')
-
     user_query = '''
         INSERT INTO users (id_user, role, full_name, username, password, company_id, company_name, billing_account_id, email, phone) 
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -114,7 +116,6 @@ async def register(user: UserCreate, db=Depends(get_db)):
     except asyncpg.exceptions.StringDataRightTruncationError as e:
         print(id_user, user.role, user.full_name, user.username, hashed_password, user.company_id, company['company_name'], company['billing_account_id'], user.email, user.phone)
         raise HTTPException(status_code=400, detail='Invalid data provided')
-
     return {'message': 'User registered successfully', 'id_user': id_user}
 
 @router.get('/', response_model=List[User])
@@ -150,12 +151,15 @@ async def get_users_by_company_id(company_id: str, db=Depends(get_db)):
 @router.put('/{id_user}')
 async def update_user(id_user: str, user: UserUpdate, db=Depends(get_db)):
     update_data = user.dict(exclude_unset=True)
+    if 'username' in update_data:
+        # Cek apakah username sudah dipakai user lain
+        username_check = await db.fetchrow('SELECT 1 FROM users WHERE username = $1 AND id_user != $2', update_data['username'], id_user)
+        if username_check:
+            raise HTTPException(status_code=400, detail='Username already exists')
     if 'password' in update_data:
         update_data['password'] = bcrypt.hashpw(update_data['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-
     set_clause = ', '.join([f"{key} = ${i+1}" for i, key in enumerate(update_data.keys())])
     values = list(update_data.values()) + [id_user]
-
     query = f"UPDATE users SET {set_clause} WHERE id_user = ${len(values)}"
     result = await db.execute(query, *values)
     if result == 'UPDATE 0':

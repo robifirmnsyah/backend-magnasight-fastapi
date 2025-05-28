@@ -28,6 +28,7 @@ class Customer(BaseModel):
     billing_account_id: str
     maintenance: str
     limit_ticket: int
+    ticket_usage: int  # tambahkan field ini
 
 class CustomerCreate(BaseModel):
     company_name: str
@@ -52,13 +53,13 @@ async def create_customer(customer: CustomerCreate, db=Depends(get_db)):
 
 @router.get('/', response_model=List[Customer])
 async def get_customers(db=Depends(get_db)):
-    query = 'SELECT company_id, company_name, billing_account_id, maintenance, limit_ticket FROM customers'
+    query = 'SELECT company_id, company_name, billing_account_id, maintenance, limit_ticket, ticket_usage FROM customers'
     results = await db.fetch(query)
     return [dict(result) for result in results]
 
 @router.get('/{company_id}', response_model=Customer)
 async def get_customer(company_id: str, db=Depends(get_db)):
-    query = 'SELECT company_id, company_name, billing_account_id, maintenance, limit_ticket FROM customers WHERE company_id = $1'
+    query = 'SELECT company_id, company_name, billing_account_id, maintenance, limit_ticket, ticket_usage FROM customers WHERE company_id = $1'
     result = await db.fetchrow(query, company_id)
     if not result:
         raise HTTPException(status_code=404, detail='Customer not found')
