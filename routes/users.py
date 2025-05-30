@@ -223,11 +223,7 @@ async def get_projects_for_user(id_user: str, db=Depends(get_db)):
         query = 'SELECT project_id FROM user_projects WHERE id_user = $1'
         results = await db.fetch(query, id_user)
         return [row['project_id'] for row in results]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Failed to get projects for user: {str(e)}')
-
-@router.get('/project/{project_id}', response_model=List[str])
-async def get_users_for_project(project_id: str, db=Depends(get_db)):
+    def get_users_for_project(project_id: str, db=Depends(get_db)):
     try:
         query = 'SELECT id_user FROM user_projects WHERE project_id = $1'
         results = await db.fetch(query, project_id)
@@ -238,11 +234,18 @@ async def get_users_for_project(project_id: str, db=Depends(get_db)):
 @router.delete('/project')
 async def remove_user_from_project(user_project: UserProject, db=Depends(get_db)):
     try:
+        # Hapus user dari user_projects
         query = 'DELETE FROM user_projects WHERE id_user = $1 AND project_id = $2'
         result = await db.execute(query, user_project.id_user, user_project.project_id)
+        # Cari semua grup yang punya akses ke project ini
+        group_query = 'SELECT group_id FROM group_projects WHERE project_id = $1'
+        groups = await db.fetch(group_query, user_project.project_id)
+        for group in groups:
+            # Hapus user dari user_groups untuk grup tersebut (abaikan jika tidak ada)
+            await db.execute('DELETE FROM user_groups WHERE id_user = $1 AND group_id = $2', user_project.id_user, group['group_id'])
         if result == 'DELETE 0':
             raise HTTPException(status_code=404, detail='User-project relation not found')
-        return {'message': 'User removed from project'}
+        return {'message': 'User removed from project and related groups'}
     except HTTPException:
         raise
     except Exception as e:
