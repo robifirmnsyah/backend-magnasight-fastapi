@@ -238,17 +238,20 @@ async def get_users_for_project(project_id: str, db=Depends(get_db)):
 @router.delete('/project')
 async def remove_user_from_project(user_project: UserProject, db=Depends(get_db)):
     try:
+        # Cek dulu apakah relasi user-project ada
+        check_query = 'SELECT 1 FROM user_projects WHERE id_user = $1 AND project_id = $2'
+        exists = await db.fetchrow(check_query, user_project.id_user, user_project.project_id)
+        if not exists:
+            raise HTTPException(status_code=404, detail='User-project relation not found')
         # Hapus user dari user_projects
         query = 'DELETE FROM user_projects WHERE id_user = $1 AND project_id = $2'
-        result = await db.execute(query, user_project.id_user, user_project.project_id)
+        await db.execute(query, user_project.id_user, user_project.project_id)
         # Cari semua grup yang punya akses ke project ini
         group_query = 'SELECT group_id FROM group_projects WHERE project_id = $1'
         groups = await db.fetch(group_query, user_project.project_id)
         for group in groups:
             # Hapus user dari user_groups untuk grup tersebut (abaikan jika tidak ada)
             await db.execute('DELETE FROM user_groups WHERE id_user = $1 AND group_id = $2', user_project.id_user, group['group_id'])
-        if result == 'DELETE 0':
-            raise HTTPException(status_code=404, detail='User-project relation not found')
         return {'message': 'User removed from project and related groups'}
     except HTTPException:
         raise
