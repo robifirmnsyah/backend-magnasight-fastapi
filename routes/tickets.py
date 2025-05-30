@@ -125,6 +125,10 @@ def build_ticket_email_html(**context):
     template = template_env.get_template('ticket_email.html')
     return template.render(**context)
 
+def build_ticket_close_email_html(**context):
+    template = template_env.get_template('ticket_close_email.html')
+    return template.render(**context)
+
 # Endpoints
 @router.post('/', response_model=Ticket)
 async def create_ticket(
@@ -239,8 +243,10 @@ async def get_ticket(ticket_id: str, db=Depends(get_db)):
         raise HTTPException(status_code=500, detail=f'Failed to get ticket: {str(e)}')
 
 @router.put('/{ticket_id}')
-async def update_ticket(ticket_id: str, ticket: TicketUpdate, db=Depends(get_db)):
+async def update_ticket(ticket_id: str, ticket: TicketUpdate, db=Depends(get_db), background_tasks: BackgroundTasks = None):
     try:
+        # Ambil data ticket sebelum update
+        old_ticket = await db.fetchrow('SELECT * FROM tickets WHERE ticket_id = $1', ticket_id)
         query = '''
             UPDATE tickets 
             SET product_list = $1, describe_issue = $2, detail_issue = $3, priority = $4, contact = $5, status = $6 
@@ -249,6 +255,28 @@ async def update_ticket(ticket_id: str, ticket: TicketUpdate, db=Depends(get_db)
         result = await db.execute(query, ticket.product_list, ticket.describe_issue, ticket.detail_issue, ticket.priority, ticket.contact, ticket.status, ticket_id)
         if result == 'UPDATE 0':
             raise HTTPException(status_code=404, detail='Ticket not found')
+        # Ambil data ticket setelah update
+        updated_ticket = await db.fetchrow('SELECT * FROM tickets WHERE ticket_id = $1', ticket_id)
+        # Jika status berubah menjadi Closed, kirim email notifikasi
+        if old_ticket and old_ticket['status'] != 'Closed' and ticket.status == 'Closed':
+            user_query = 'SELECT full_name, email FROM users WHERE id_user = $1'
+            user = await db.fetchrow(user_query, updated_ticket['id_user'])
+            user_name = user['full_name'] if user else updated_ticket['id_user']
+            to_email = user['email'] if user else updated_ticket['contact']
+            html_content = build_ticket_close_email_html(
+                ticket_id=updated_ticket['ticket_id'],
+                company_name=updated_ticket['company_name'],
+                product_list=updated_ticket['product_list'],
+                describe_issue=updated_ticket['describe_issue'],
+                detail_issue=updated_ticket['detail_issue'],
+                priority=updated_ticket['priority'],
+                closed_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                user_name=user_name
+            )
+            if background_tasks:
+                background_tasks.add_task(send_ticket_email, to_email, "Ticket Closed", html_content, True, updated_ticket['attachment'])
+            else:
+                await send_ticket_email(to_email, "Ticket Closed", html_content, True, updated_ticket['attachment'])
         return {'message': 'Ticket updated successfully'}
     except HTTPException:
         raise
