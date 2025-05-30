@@ -173,7 +173,7 @@ async def create_ticket(
         user_name = user['full_name'] if user else ticket_data.id_user
 
         # Kirim email di background
-        subject = "New Ticket Created"
+        subject = f"[{ticket_id}] {ticket_data.describe_issue}"
         content = f"Ticket ID: {ticket_id}\nPriority: {ticket_data.priority}\nStatus: Open"
         html_content = build_ticket_email_html(
             ticket_id=ticket_id,
@@ -263,6 +263,7 @@ async def update_ticket(ticket_id: str, ticket: TicketUpdate, db=Depends(get_db)
             user = await db.fetchrow(user_query, updated_ticket['id_user'])
             user_name = user['full_name'] if user else updated_ticket['id_user']
             to_email = user['email'] if user else updated_ticket['contact']
+            subject = f"[{updated_ticket['ticket_id']}] {updated_ticket['describe_issue']}"
             html_content = build_ticket_close_email_html(
                 ticket_id=updated_ticket['ticket_id'],
                 company_name=updated_ticket['company_name'],
@@ -274,9 +275,9 @@ async def update_ticket(ticket_id: str, ticket: TicketUpdate, db=Depends(get_db)
                 user_name=user_name
             )
             if background_tasks:
-                background_tasks.add_task(send_ticket_email, to_email, "Ticket Closed", html_content, True, updated_ticket['attachment'])
+                background_tasks.add_task(send_ticket_email, to_email, subject, html_content, True, updated_ticket['attachment'])
             else:
-                await send_ticket_email(to_email, "Ticket Closed", html_content, True, updated_ticket['attachment'])
+                await send_ticket_email(to_email, subject, html_content, True, updated_ticket['attachment'])
         return {'message': 'Ticket updated successfully'}
     except HTTPException:
         raise
