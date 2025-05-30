@@ -223,7 +223,11 @@ async def get_projects_for_user(id_user: str, db=Depends(get_db)):
         query = 'SELECT project_id FROM user_projects WHERE id_user = $1'
         results = await db.fetch(query, id_user)
         return [row['project_id'] for row in results]
-    def get_users_for_project(project_id: str, db=Depends(get_db)):
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to get projects for user: {str(e)}')
+
+@router.get('/project/project/{project_id}', response_model=List[str])
+async def get_users_for_project(project_id: str, db=Depends(get_db)):
     try:
         query = 'SELECT id_user FROM user_projects WHERE project_id = $1'
         results = await db.fetch(query, project_id)
