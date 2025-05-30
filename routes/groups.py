@@ -142,6 +142,15 @@ async def add_users_to_group(group_id: str, id_users: List[str], db=Depends(get_
             raise HTTPException(status_code=400, detail='All users are already in the group')
         query = 'INSERT INTO user_groups (id_user, group_id) VALUES ($1, $2)'
         await db.executemany(query, [(id_user, group_id) for id_user in new_users])
+        # Tambahkan akses ke semua project di grup untuk user baru
+        project_query = 'SELECT project_id FROM group_projects WHERE group_id = $1'
+        projects = await db.fetch(project_query, group_id)
+        for id_user in new_users:
+            for project in projects:
+                check_user_project = 'SELECT 1 FROM user_projects WHERE id_user = $1 AND project_id = $2'
+                exists_user_project = await db.fetchrow(check_user_project, id_user, project['project_id'])
+                if not exists_user_project:
+                    await db.execute('INSERT INTO user_projects (id_user, project_id) VALUES ($1, $2)', id_user, project['project_id'])
         return {'message': 'Users added to group successfully', 'added_users': new_users}
     except HTTPException:
         raise
@@ -165,6 +174,11 @@ async def get_users_in_group(group_id: str, db=Depends(get_db)):
 @router.delete('/{group_id}/users/{id_user}')
 async def delete_user_from_group(group_id: str, id_user: str, db=Depends(get_db)):
     try:
+        # Hapus akses user ke semua project di grup
+        project_query = 'SELECT project_id FROM group_projects WHERE group_id = $1'
+        projects = await db.fetch(project_query, group_id)
+        for project in projects:
+            await db.execute('DELETE FROM user_projects WHERE id_user = $1 AND project_id = $2', id_user, project['project_id'])
         query = 'DELETE FROM user_groups WHERE group_id = $1 AND id_user = $2'
         result = await db.execute(query, group_id, id_user)
         if result == 'DELETE 0':
@@ -223,6 +237,11 @@ async def add_projects_to_group(group_id: str, project_ids: List[str] = Body(...
 @router.delete('/{group_id}/projects/{project_id}')
 async def delete_project_from_group(group_id: str, project_id: str, db=Depends(get_db)):
     try:
+        # Hapus akses semua user di grup ke project ini
+        user_query = 'SELECT id_user FROM user_groups WHERE group_id = $1'
+        users = await db.fetch(user_query, group_id)
+        for user in users:
+            await db.execute('DELETE FROM user_projects WHERE id_user = $1 AND project_id = $2', user['id_user'], project_id)
         query = 'DELETE FROM group_projects WHERE group_id = $1 AND project_id = $2'
         result = await db.execute(query, group_id, project_id)
         if result == 'DELETE 0':
