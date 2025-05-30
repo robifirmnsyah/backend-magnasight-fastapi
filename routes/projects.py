@@ -148,15 +148,10 @@ async def get_projects_by_group(group_id: str, db=Depends(get_db)):
         raise HTTPException(status_code=500, detail=f'Failed to get projects by group: {str(e)}')
 
 @router.get('/user/{id_user}/projects', response_model=List[str])
-async def get_project_ids_for_user(id_user: str, db=Depends(get_db)):
+async def get_projects_for_user(id_user: str, db=Depends(get_db)):
     try:
-        query = '''
-            SELECT gp.project_id
-            FROM group_projects gp
-            JOIN user_groups ug ON gp.group_id = ug.group_id
-            WHERE ug.id_user = $1
-        '''
+        query = 'SELECT project_id FROM user_projects WHERE id_user = $1'
         results = await db.fetch(query, id_user)
-        return [record['project_id'] for record in results]
+        return [row['project_id'] for row in results]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to get projects for user: {str(e)}')
