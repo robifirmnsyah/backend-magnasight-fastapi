@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from email.message import EmailMessage
 import aiosmtplib
 from jinja2 import Environment, FileSystemLoader
+import aiohttp
 
 router = APIRouter()
 
@@ -82,7 +83,7 @@ def upload_file_to_gcs(file: UploadFile, destination_blob_name: str) -> str:
 # Email configuration
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@email.com")  # set di .env atau environment
 
-async def send_ticket_email(to_email: str, subject: str, content: str, is_html: bool = False):
+async def send_ticket_email(to_email: str, subject: str, content: str, is_html: bool = False, attachment_url: str = None):
     message = EmailMessage()
     message["From"] = ADMIN_EMAIL
     message["To"] = to_email
@@ -92,6 +93,21 @@ async def send_ticket_email(to_email: str, subject: str, content: str, is_html: 
         message.add_alternative(content, subtype="html")
     else:
         message.set_content(content)
+
+    # Jika ada attachment_url, download dan attach ke email
+    if attachment_url:
+        filename = attachment_url.split("/")[-1].split("?")[0]
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(attachment_url) as resp:
+                    if resp.status == 200:
+                        file_bytes = await resp.read()
+                        maintype, subtype = 'application', 'octet-stream'
+                        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                            maintype, subtype = 'image', filename.split('.')[-1].lower()
+                        message.add_attachment(file_bytes, maintype=maintype, subtype=subtype, filename=filename)
+        except Exception:
+            pass  # Jika gagal download attachment, email tetap dikirim tanpa attachment
 
     await aiosmtplib.send(
         message,
@@ -168,8 +184,8 @@ async def create_ticket(
             user_name=user_name
         )
 
-        background_tasks.add_task(send_ticket_email, ticket_data.contact, subject, html_content, True)
-        background_tasks.add_task(send_ticket_email, ADMIN_EMAIL, subject, content, False)
+        background_tasks.add_task(send_ticket_email, ticket_data.contact, subject, html_content, True, attachment_url)
+        background_tasks.add_task(send_ticket_email, ADMIN_EMAIL, subject, content, False, attachment_url)
 
         return dict(result)
     except HTTPException:
