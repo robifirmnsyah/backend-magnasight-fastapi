@@ -25,12 +25,10 @@ async def get_db():
 # Models
 class Project(BaseModel):
     project_id: str
-    project_name: str
     company_id: str
     billing_account_id: str
 
 class ProjectCreate(BaseModel):
-    project_name: str
     company_id: str
 
 class UserProject(BaseModel):
@@ -71,17 +69,20 @@ async def import_projects_from_billing(billing_account_id: str, db=Depends(get_d
             raise HTTPException(status_code=404, detail='No projects found from external API')
         inserted, skipped = [], []
         for proj in projects:
-            project_id = proj['project_id']
+            project_id = proj.get('project_id')
+            if not project_id:
+                skipped.append('null_or_empty')
+                continue
             # Cek apakah sudah ada
             exists = await db.fetchrow('SELECT 1 FROM projects WHERE project_id = $1', project_id)
             if exists:
                 skipped.append(project_id)
                 continue
             query = '''
-                INSERT INTO projects (project_id, project_name, company_id, billing_account_id)
-                VALUES ($1, $2, $3, $4)
+                INSERT INTO projects (project_id, company_id, billing_account_id)
+                VALUES ($1, $2, $3)
             '''
-            await db.execute(query, project_id, project_id, company_id, billing_account_id)
+            await db.execute(query, project_id, company_id, billing_account_id)
             inserted.append(project_id)
         return {
             'inserted': inserted,
@@ -96,7 +97,7 @@ async def import_projects_from_billing(billing_account_id: str, db=Depends(get_d
 @router.get('/', response_model=List[Project])
 async def get_projects(db=Depends(get_db)):
     try:
-        query = 'SELECT project_id, project_name, company_id, billing_account_id FROM projects'
+        query = 'SELECT project_id, company_id, billing_account_id FROM projects'
         results = await db.fetch(query)
         return [dict(result) for result in results]
     except Exception as e:
@@ -105,7 +106,7 @@ async def get_projects(db=Depends(get_db)):
 @router.get('/{project_id}', response_model=Project)
 async def get_project(project_id: str, db=Depends(get_db)):
     try:
-        query = 'SELECT project_id, project_name, company_id, billing_account_id FROM projects WHERE project_id = $1'
+        query = 'SELECT project_id, company_id, billing_account_id FROM projects WHERE project_id = $1'
         result = await db.fetchrow(query, project_id)
         if not result:
             raise HTTPException(status_code=404, detail='Project not found')
@@ -118,7 +119,7 @@ async def get_project(project_id: str, db=Depends(get_db)):
 @router.get('/company/{company_id}', response_model=List[Project])
 async def get_projects_by_company_id(company_id: str, db=Depends(get_db)):
     try:
-        query = 'SELECT project_id, project_name, company_id, billing_account_id FROM projects WHERE company_id = $1'
+        query = 'SELECT project_id, company_id, billing_account_id FROM projects WHERE company_id = $1'
         results = await db.fetch(query, company_id)
         if not results:
             raise HTTPException(status_code=404, detail='No projects found for this company')
@@ -138,10 +139,10 @@ async def update_project(project_id: str, project: ProjectCreate, db=Depends(get
         billing_account_id = company['billing_account_id']
         query = '''
             UPDATE projects 
-            SET project_name = $1, company_id = $2, billing_account_id = $3 
-            WHERE project_id = $4
+            SET company_id = $1, billing_account_id = $2 
+            WHERE project_id = $3
         '''
-        result = await db.execute(query, project.project_name, project.company_id, billing_account_id, project_id)
+        result = await db.execute(query, project.company_id, billing_account_id, project_id)
         if result == 'UPDATE 0':
             raise HTTPException(status_code=404, detail='Project not found')
         return {'message': 'Project updated successfully'}
