@@ -110,11 +110,27 @@ async def update_customer(company_id: str, customer: CustomerCreate, db=Depends(
 @router.delete('/{company_id}')
 async def delete_customer(company_id: str, db=Depends(get_db)):
     try:
-        query = 'DELETE FROM customers WHERE company_id = $1'
-        result = await db.execute(query, company_id)
+        # 1. Hapus comment ticket
+        await db.execute('DELETE FROM ticket_comments WHERE ticket_id IN (SELECT ticket_id FROM tickets WHERE company_id = $1)', company_id)
+        # 2. Hapus ticket
+        await db.execute('DELETE FROM tickets WHERE company_id = $1', company_id)
+        # 3. Hapus user_groups (relasi user ke group)
+        await db.execute('DELETE FROM user_groups WHERE id_user IN (SELECT id_user FROM users WHERE company_id = $1)', company_id)
+        # 4. Hapus user_projects (relasi user ke project)
+        await db.execute('DELETE FROM user_projects WHERE id_user IN (SELECT id_user FROM users WHERE company_id = $1)', company_id)
+        # 5. Hapus group_projects (relasi group ke project)
+        await db.execute('DELETE FROM group_projects WHERE group_id IN (SELECT group_id FROM groups WHERE company_id = $1)', company_id)
+        # 6. Hapus groups
+        await db.execute('DELETE FROM groups WHERE company_id = $1', company_id)
+        # 7. Hapus projects
+        await db.execute('DELETE FROM projects WHERE company_id = $1', company_id)
+        # 8. Hapus users
+        await db.execute('DELETE FROM users WHERE company_id = $1', company_id)
+        # 9. Hapus customer
+        result = await db.execute('DELETE FROM customers WHERE company_id = $1', company_id)
         if result == 'DELETE 0':
             raise HTTPException(status_code=404, detail='Customer not found')
-        return {'message': 'Customer deleted successfully'}
+        return {'message': 'Customer and all related data deleted successfully'}
     except HTTPException:
         raise
     except Exception as e:
