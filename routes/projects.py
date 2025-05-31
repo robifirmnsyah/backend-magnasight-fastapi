@@ -60,7 +60,7 @@ async def import_projects_from_billing(billing_account_id: str, db=Depends(get_d
         # Fetch project list dari API eksternal
         url = f'https://billingsight.magnaglobal.id/get-projects?billing_account_id={billing_account_id}'
         try:
-            resp = requests.get(url, timeout=10)
+            resp = requests.get(url, timeout=30)
         except Exception as e:
             raise HTTPException(status_code=502, detail=f'Failed to connect to external API: {str(e)}')
         if resp.status_code != 200:
