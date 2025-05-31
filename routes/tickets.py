@@ -326,3 +326,12 @@ async def get_comments(ticket_id: str, db=Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to get comments: {str(e)}')
+
+@router.get('/company/{company_id}', response_model=List[Ticket])
+async def get_tickets_by_company(company_id: str, db=Depends(get_db)):
+    try:
+        query = 'SELECT * FROM tickets WHERE company_id = $1'
+        results = await db.fetch(query, company_id)
+        return [dict(result) for result in results]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to get tickets by company: {str(e)}')
