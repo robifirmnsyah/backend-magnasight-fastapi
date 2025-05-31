@@ -4,6 +4,7 @@ from typing import List
 import asyncpg
 import os
 import random
+import requests
 
 router = APIRouter()
 
@@ -39,30 +40,55 @@ class UserProject(BaseModel):
 class GroupProject(BaseModel):
     group_id: str
 
+class ProjectImportRequest(BaseModel):
+    billing_account_id: str
+
 # Helper function to generate unique project_id
 def generate_project_id() -> str:
     return f"PROJ-{random.randint(10000, 99999)}"
 
 # Endpoints
 @router.post('/')
-async def create_project(project: ProjectCreate, db=Depends(get_db)):
+async def import_projects_from_billing(request: ProjectImportRequest, db=Depends(get_db)):
     try:
-        project_id = generate_project_id()
-        company_query = 'SELECT billing_account_id FROM customers WHERE company_id = $1'
-        company = await db.fetchrow(company_query, project.company_id)
+        # Cari company_id berdasarkan billing_account_id
+        company_query = 'SELECT company_id FROM customers WHERE billing_account_id = $1'
+        company = await db.fetchrow(company_query, request.billing_account_id)
         if not company:
-            raise HTTPException(status_code=404, detail='Company not found')
-        billing_account_id = company['billing_account_id']
-        query = '''
-            INSERT INTO projects (project_id, project_name, company_id, billing_account_id) 
-            VALUES ($1, $2, $3, $4)
-        '''
-        await db.execute(query, project_id, project.project_name, project.company_id, billing_account_id)
-        return {'message': 'Project created successfully', 'project_id': project_id}
+            raise HTTPException(status_code=404, detail='Company not found for this billing_account_id')
+        company_id = company['company_id']
+        # Fetch project list dari API eksternal
+        url = f'https://billingsight.magnaglobal.id/get-projects?billing_account_id={request.billing_account_id}'
+        resp = requests.get(url)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail='Failed to fetch projects from external API')
+        data = resp.json()
+        projects = data.get('projects data', [])
+        if not projects:
+            raise HTTPException(status_code=404, detail='No projects found from external API')
+        inserted, skipped = [], []
+        for proj in projects:
+            project_id = proj['project_id']
+            # Cek apakah sudah ada
+            exists = await db.fetchrow('SELECT 1 FROM projects WHERE project_id = $1', project_id)
+            if exists:
+                skipped.append(project_id)
+                continue
+            query = '''
+                INSERT INTO projects (project_id, project_name, company_id, billing_account_id)
+                VALUES ($1, $2, $3, $4)
+            '''
+            await db.execute(query, project_id, project_id, company_id, request.billing_account_id)
+            inserted.append(project_id)
+        return {
+            'inserted': inserted,
+            'skipped_existing': skipped,
+            'company_id': company_id
+        }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Failed to create project: {str(e)}')
+        raise HTTPException(status_code=500, detail=f'Failed to import projects: {str(e)}')
 
 @router.get('/', response_model=List[Project])
 async def get_projects(db=Depends(get_db)):
