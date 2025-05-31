@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import List
 import asyncpg
 import os
 import random
+import requests
 
 router = APIRouter()
 
@@ -42,7 +43,7 @@ def generate_company_id() -> str:
 
 # Endpoints
 @router.post('/')
-async def create_customer(customer: CustomerCreate, db=Depends(get_db)):
+async def create_customer(customer: CustomerCreate, background_tasks: BackgroundTasks, db=Depends(get_db)):
     try:
         company_id = generate_company_id()
         query = '''
@@ -50,6 +51,19 @@ async def create_customer(customer: CustomerCreate, db=Depends(get_db)):
             VALUES ($1, $2, $3, $4, $5)
         '''
         await db.execute(query, company_id, customer.company_name, customer.billing_account_id, customer.maintenance, customer.limit_ticket)
+        
+        # Tambahkan background task untuk import project
+        def import_projects(billing_account_id: str):
+            try:
+                # Ganti URL sesuai base URL API Anda jika perlu
+                url = f'https://coresight.magnaglobal.id/api/projects/{billing_account_id}'
+                requests.post(url, timeout=60)
+            except Exception as e:
+                # Log error jika perlu
+                print(f"Failed to import projects for billing_account_id {billing_account_id}: {e}")
+
+        background_tasks.add_task(import_projects, customer.billing_account_id)
+
         return {'message': 'Customer created successfully', 'company_id': company_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to create customer: {str(e)}')
