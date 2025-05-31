@@ -150,7 +150,10 @@ async def add_users_to_group(group_id: str, id_users: List[str], db=Depends(get_
                 check_user_project = 'SELECT 1 FROM user_projects WHERE id_user = $1 AND project_id = $2'
                 exists_user_project = await db.fetchrow(check_user_project, id_user, project['project_id'])
                 if not exists_user_project:
-                    await db.execute('INSERT INTO user_projects (id_user, project_id) VALUES ($1, $2)', id_user, project['project_id'])
+                    await db.execute(
+                        'INSERT INTO user_projects (id_user, project_id, on_group) VALUES ($1, $2, $3)',
+                        id_user, project['project_id'], group_id
+                    )
         return {'message': 'Users added to group successfully', 'added_users': new_users}
     except HTTPException:
         raise
@@ -178,7 +181,10 @@ async def delete_user_from_group(group_id: str, id_user: str, db=Depends(get_db)
         project_query = 'SELECT project_id FROM group_projects WHERE group_id = $1'
         projects = await db.fetch(project_query, group_id)
         for project in projects:
-            await db.execute('DELETE FROM user_projects WHERE id_user = $1 AND project_id = $2', id_user, project['project_id'])
+            await db.execute(
+                'DELETE FROM user_projects WHERE id_user = $1 AND project_id = $2 AND on_group = $3',
+                id_user, project['project_id'], group_id
+            )
         query = 'DELETE FROM user_groups WHERE group_id = $1 AND id_user = $2'
         result = await db.execute(query, group_id, id_user)
         if result == 'DELETE 0':

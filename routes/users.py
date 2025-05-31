@@ -64,6 +64,7 @@ class UserLogin(BaseModel):
 class UserProject(BaseModel):
     id_user: str
     project_id: str
+    on_group: Optional[str] = None
 
 # Helper function to generate unique ID
 def generate_unique_id(prefix: str) -> str:
@@ -189,21 +190,18 @@ async def update_user(id_user: str, user: UserUpdate, db=Depends(get_db)):
 @router.delete('/project')
 async def remove_user_from_project(user_project: UserProject, db=Depends(get_db)):
     try:
-        # Cek dulu apakah relasi user-project ada
-        check_query = 'SELECT 1 FROM user_projects WHERE id_user = $1 AND project_id = $2'
-        exists = await db.fetchrow(check_query, user_project.id_user, user_project.project_id)
-        if not exists:
+        check_query = 'SELECT on_group FROM user_projects WHERE id_user = $1 AND project_id = $2'
+        record = await db.fetchrow(check_query, user_project.id_user, user_project.project_id)
+        if not record:
             raise HTTPException(status_code=404, detail='User-project relation not found')
-        # Hapus user dari user_projects
+        if record['on_group']:
+            raise HTTPException(
+                status_code=403,
+                detail='User got access from group. Remove user from group to revoke access.'
+            )
         query = 'DELETE FROM user_projects WHERE id_user = $1 AND project_id = $2'
         await db.execute(query, user_project.id_user, user_project.project_id)
-        # Cari semua grup yang punya akses ke project ini
-        group_query = 'SELECT group_id FROM group_projects WHERE project_id = $1'
-        groups = await db.fetch(group_query, user_project.project_id)
-        for group in groups:
-            # Hapus user dari user_groups untuk grup tersebut (abaikan jika tidak ada)
-            await db.execute('DELETE FROM user_groups WHERE id_user = $1 AND group_id = $2', user_project.id_user, group['group_id'])
-        return {'message': 'User removed from project and related groups'}
+        return {'message': 'User removed from project'}
     except HTTPException:
         raise
     except Exception as e:
@@ -231,8 +229,8 @@ async def add_user_to_project(user_project: UserProject, db=Depends(get_db)):
         exists = await db.fetchrow(check_query, user_project.id_user, user_project.project_id)
         if exists:
             raise HTTPException(status_code=400, detail='User already assigned to this project')
-        query = 'INSERT INTO user_projects (id_user, project_id) VALUES ($1, $2)'
-        await db.execute(query, user_project.id_user, user_project.project_id)
+        query = 'INSERT INTO user_projects (id_user, project_id, on_group) VALUES ($1, $2, $3)'
+        await db.execute(query, user_project.id_user, user_project.project_id, None)
         return {'message': 'User added to project'}
     except HTTPException:
         raise
@@ -248,7 +246,7 @@ async def get_projects_for_user(id_user: str, db=Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to get projects for user: {str(e)}')
 
-@router.get('/project/project/{project_id}', response_model=List[str])
+@router.get('/project/{project_id}', response_model=List[str])
 async def get_users_for_project(project_id: str, db=Depends(get_db)):
     try:
         query = 'SELECT id_user FROM user_projects WHERE project_id = $1'
