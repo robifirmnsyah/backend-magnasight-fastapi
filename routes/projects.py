@@ -48,20 +48,23 @@ def generate_project_id() -> str:
     return f"PROJ-{random.randint(10000, 99999)}"
 
 # Endpoints
-@router.post('/')
-async def import_projects_from_billing(request: ProjectImportRequest, db=Depends(get_db)):
+@router.post('/{billing_account_id}')
+async def import_projects_from_billing(billing_account_id: str, db=Depends(get_db)):
     try:
         # Cari company_id berdasarkan billing_account_id
         company_query = 'SELECT company_id FROM customers WHERE billing_account_id = $1'
-        company = await db.fetchrow(company_query, request.billing_account_id)
+        company = await db.fetchrow(company_query, billing_account_id)
         if not company:
             raise HTTPException(status_code=404, detail='Company not found for this billing_account_id')
         company_id = company['company_id']
         # Fetch project list dari API eksternal
-        url = f'https://billingsight.magnaglobal.id/get-projects?billing_account_id={request.billing_account_id}'
-        resp = requests.get(url)
+        url = f'https://billingsight.magnaglobal.id/get-projects?billing_account_id={billing_account_id}'
+        try:
+            resp = requests.get(url, timeout=10)
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f'Failed to connect to external API: {str(e)}')
         if resp.status_code != 200:
-            raise HTTPException(status_code=502, detail='Failed to fetch projects from external API')
+            raise HTTPException(status_code=502, detail=f'Failed to fetch projects from external API: {resp.text}')
         data = resp.json()
         projects = data.get('projects data', [])
         if not projects:
@@ -78,7 +81,7 @@ async def import_projects_from_billing(request: ProjectImportRequest, db=Depends
                 INSERT INTO projects (project_id, project_name, company_id, billing_account_id)
                 VALUES ($1, $2, $3, $4)
             '''
-            await db.execute(query, project_id, project_id, company_id, request.billing_account_id)
+            await db.execute(query, project_id, project_id, company_id, billing_account_id)
             inserted.append(project_id)
         return {
             'inserted': inserted,
