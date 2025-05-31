@@ -51,7 +51,7 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     full_name: Optional[constr(max_length=50)]
     username: Optional[constr(max_length=20)]
-    password: Optional[str]
+    password: Optional[str] = None
     company_id: Optional[str]
     role: Optional[constr(max_length=20)]
     email: Optional[constr(max_length=50)]
@@ -174,8 +174,10 @@ async def update_user(id_user: str, user: UserUpdate, db=Depends(get_db)):
             username_check = await db.fetchrow('SELECT 1 FROM users WHERE username = $1 AND id_user != $2', update_data['username'], id_user)
             if username_check:
                 raise HTTPException(status_code=400, detail='Username already exists')
-        if 'password' in update_data:
+        if 'password' in update_data and update_data['password']:
             update_data['password'] = bcrypt.hashpw(update_data['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        elif 'password' in update_data and not update_data['password']:
+            del update_data['password']
         set_clause = ', '.join([f"{key} = ${i+1}" for i, key in enumerate(update_data.keys())])
         values = list(update_data.values()) + [id_user]
         query = f"UPDATE users SET {set_clause} WHERE id_user = ${len(values)}"
