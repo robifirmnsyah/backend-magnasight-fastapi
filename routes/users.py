@@ -134,20 +134,22 @@ async def get_users(db=Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to get users: {str(e)}')
 
-@router.get('/{id_user}', response_model=List[User])
-async def get_users_by_role(id_user: str, db=Depends(get_db)):
+@router.get('/{id_user}', response_model=User)
+async def get_user_by_id(id_user: str, db=Depends(get_db)):
     try:
-        user_query = 'SELECT company_id FROM users WHERE id_user = $1'
-        user = await db.fetchrow(user_query, id_user)
+        query = '''
+            SELECT id_user, role, full_name, username, company_id, company_name, billing_account_id, email, phone
+            FROM users
+            WHERE id_user = $1
+        '''
+        user = await db.fetchrow(query, id_user)
         if not user:
             raise HTTPException(status_code=404, detail='User not found')
-        query = 'SELECT id_user, role, full_name, username, company_id, company_name, billing_account_id, email, phone FROM users WHERE company_id = $1'
-        results = await db.fetch(query, user['company_id'])
-        return [dict(result) for result in results]
+        return dict(user)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Failed to get users by role: {str(e)}')
+        raise HTTPException(status_code=500, detail=f'Failed to get user by id: {str(e)}')
 
 @router.get('/company/{company_id}', response_model=List[User])
 async def get_users_by_company_id(company_id: str, db=Depends(get_db)):
