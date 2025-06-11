@@ -130,13 +130,20 @@ async def login(user: UserLogin, db=Depends(get_db)):
 @router.post('/')
 async def register(user: UserCreate, db=Depends(get_db)):
     try:
+        # Check username
         username_check = await db.fetchrow('SELECT 1 FROM users WHERE username = $1', user.username)
         if username_check:
-            raise HTTPException(status_code=400, detail='Username already exists')
+            raise HTTPException(status_code=400, detail='Username sudah digunakan')
             
+        # Check email
         email_check = await db.fetchrow('SELECT 1 FROM users WHERE email = $1', user.email)
         if email_check:
-            raise HTTPException(status_code=400, detail='Email already exists')
+            raise HTTPException(status_code=400, detail='Email sudah digunakan')
+            
+        # Check phone number
+        phone_check = await db.fetchrow('SELECT 1 FROM users WHERE phone = $1', user.phone)
+        if phone_check:
+            raise HTTPException(status_code=400, detail='Nomor telepon sudah digunakan')
             
         id_user = generate_unique_id('USER')
         hashed_password = bcrypt.hashpw(user.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -213,10 +220,25 @@ async def get_users_by_company_id(company_id: str, db=Depends(get_db)):
 async def update_user(id_user: str, user: UserUpdate, db=Depends(get_db)):
     try:
         update_data = user.dict(exclude_unset=True)
+        
+        # Check username if being updated
         if 'username' in update_data:
             username_check = await db.fetchrow('SELECT 1 FROM users WHERE username = $1 AND id_user != $2', update_data['username'], id_user)
             if username_check:
-                raise HTTPException(status_code=400, detail='Username already exists')
+                raise HTTPException(status_code=400, detail='Username sudah digunakan')
+                
+        # Check email if being updated
+        if 'email' in update_data:
+            email_check = await db.fetchrow('SELECT 1 FROM users WHERE email = $1 AND id_user != $2', update_data['email'], id_user)
+            if email_check:
+                raise HTTPException(status_code=400, detail='Email sudah digunakan')
+                
+        # Check phone if being updated
+        if 'phone' in update_data:
+            phone_check = await db.fetchrow('SELECT 1 FROM users WHERE phone = $1 AND id_user != $2', update_data['phone'], id_user)
+            if phone_check:
+                raise HTTPException(status_code=400, detail='Nomor telepon sudah digunakan')
+        
         if 'password' in update_data and update_data['password']:
             update_data['password'] = bcrypt.hashpw(update_data['password'].encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         elif 'password' in update_data and not update_data['password']:
