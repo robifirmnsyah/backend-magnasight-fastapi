@@ -1,1 +1,0 @@
-pip install fastapi[all] sqlalchemy psycopg2 uvicorn

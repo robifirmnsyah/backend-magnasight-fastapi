@@ -8,6 +8,9 @@ import os
 import random
 import string
 from datetime import datetime, timedelta
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 router = APIRouter()
 
@@ -38,6 +41,7 @@ class User(BaseModel):
     billing_account_id: str
     email: str
     phone: str
+    is_verified: bool = False
 
 class UserCreate(BaseModel):
     full_name: constr(max_length=50)
@@ -66,6 +70,13 @@ class UserProject(BaseModel):
     project_id: str
     on_group: Optional[str] = None
 
+class UserVerification(BaseModel):
+    email: str
+    verification_code: str
+
+class ResendVerification(BaseModel):
+    email: str
+
 # Helper function to generate unique ID
 def generate_unique_id(prefix: str) -> str:
     random_string = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -79,9 +90,16 @@ async def login(user: UserLogin, db=Depends(get_db)):
         result = await db.fetchrow(query, user.username)
         if not result:
             raise HTTPException(status_code=401, detail='Invalid username or password')
+            
         user_data = dict(result)
+        
         if not bcrypt.checkpw(user.password.encode('utf-8'), user_data['password'].encode('utf-8')):
             raise HTTPException(status_code=401, detail='Invalid username or password')
+            
+        # Check if email is verified
+        if not user_data.get('is_verified', False):
+            raise HTTPException(status_code=403, detail='Please verify your email before login')
+            
         expiration = datetime.utcnow() + timedelta(hours=1)
         token = jwt.encode({
             'id_user': user_data['id_user'],
@@ -89,11 +107,12 @@ async def login(user: UserLogin, db=Depends(get_db)):
             'role': user_data['role'],
             'exp': expiration
         }, SECRET_KEY, algorithm='HS256')
+        
         user_data['billing_account_id'] = user_data.pop('billing_account_id')
         return {
             'message': 'Login successful',
             'token': token,
-            'user': {k: v for k, v in user_data.items() if k != 'password'}
+            'user': {k: v for k, v in user_data.items() if k not in ['password', 'verification_code', 'verification_expires']}
         }
     except HTTPException:
         raise
@@ -106,18 +125,39 @@ async def register(user: UserCreate, db=Depends(get_db)):
         username_check = await db.fetchrow('SELECT 1 FROM users WHERE username = $1', user.username)
         if username_check:
             raise HTTPException(status_code=400, detail='Username already exists')
+            
+        email_check = await db.fetchrow('SELECT 1 FROM users WHERE email = $1', user.email)
+        if email_check:
+            raise HTTPException(status_code=400, detail='Email already exists')
+            
         id_user = generate_unique_id('USER')
         hashed_password = bcrypt.hashpw(user.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
         company_query = 'SELECT company_name, billing_account_id FROM customers WHERE company_id = $1'
         company = await db.fetchrow(company_query, user.company_id)
         if not company:
             raise HTTPException(status_code=404, detail='Company not found')
+            
+        # Generate OTP and expiry
+        otp = generate_otp()
+        expires = datetime.utcnow() + timedelta(minutes=10)
+        
         user_query = '''
-            INSERT INTO users (id_user, role, full_name, username, password, company_id, company_name, billing_account_id, email, phone) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            INSERT INTO users (id_user, role, full_name, username, password, company_id, company_name, billing_account_id, email, phone, is_verified, verification_code, verification_expires) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         '''
-        await db.execute(user_query, id_user, user.role, user.full_name, user.username, hashed_password, user.company_id, company['company_name'], company['billing_account_id'], user.email, user.phone)
-        return {'message': 'User registered successfully', 'id_user': id_user}
+        await db.execute(user_query, id_user, user.role, user.full_name, user.username, hashed_password, 
+                        user.company_id, company['company_name'], company['billing_account_id'], 
+                        user.email, user.phone, False, otp, expires)
+        
+        # Send verification email
+        await send_verification_email(user.email, otp, user.full_name)
+        
+        return {
+            'message': 'User registered successfully. Please check your email for verification code.',
+            'id_user': id_user,
+            'email': user.email
+        }
     except HTTPException:
         raise
     except asyncpg.exceptions.StringDataRightTruncationError as e:
@@ -258,3 +298,133 @@ async def get_users_for_project(project_id: str, db=Depends(get_db)):
         return [row['id_user'] for row in results]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to get users for project: {str(e)}')
+
+@router.post('/verify')
+async def verify_email(verification: UserVerification, db=Depends(get_db)):
+    try:
+        query = 'SELECT * FROM users WHERE email = $1'
+        user = await db.fetchrow(query, verification.email)
+        if not user:
+            raise HTTPException(status_code=404, detail='User not found')
+        # Here you should verify the OTP, for now we just simulate it
+        if verification.verification_code != '123456':
+            raise HTTPException(status_code=400, detail='Invalid verification code')
+        query = 'UPDATE users SET is_verified = $1 WHERE email = $2'
+        await db.execute(query, True, verification.email)
+        return {'message': 'Email verified successfully'}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to verify email: {str(e)}')
+
+@router.post('/verify-email')
+async def verify_email(verification: UserVerification, db=Depends(get_db)):
+    try:
+        query = '''
+            SELECT id_user, verification_code, verification_expires, is_verified 
+            FROM users 
+            WHERE email = $1
+        '''
+        user = await db.fetchrow(query, verification.email)
+        
+        if not user:
+            raise HTTPException(status_code=404, detail='User not found')
+            
+        if user['is_verified']:
+            raise HTTPException(status_code=400, detail='Email already verified')
+            
+        if user['verification_expires'] < datetime.utcnow():
+            raise HTTPException(status_code=400, detail='Verification code expired')
+            
+        if user['verification_code'] != verification.verification_code:
+            raise HTTPException(status_code=400, detail='Invalid verification code')
+            
+        # Update user as verified
+        update_query = '''
+            UPDATE users 
+            SET is_verified = TRUE, verification_code = NULL, verification_expires = NULL 
+            WHERE email = $1
+        '''
+        await db.execute(update_query, verification.email)
+        
+        return {'message': 'Email verified successfully. You can now login.'}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to verify email: {str(e)}')
+
+@router.post('/resend-verification')
+async def resend_verification(resend: ResendVerification, db=Depends(get_db)):
+    try:
+        query = 'SELECT id_user, full_name, is_verified FROM users WHERE email = $1'
+        user = await db.fetchrow(query, resend.email)
+        
+        if not user:
+            raise HTTPException(status_code=404, detail='User not found')
+            
+        if user['is_verified']:
+            raise HTTPException(status_code=400, detail='Email already verified')
+            
+        # Generate new OTP
+        otp = generate_otp()
+        expires = datetime.utcnow() + timedelta(minutes=10)
+        
+        update_query = '''
+            UPDATE users 
+            SET verification_code = $1, verification_expires = $2 
+            WHERE email = $3
+        '''
+        await db.execute(update_query, otp, expires, resend.email)
+        
+        # Send verification email
+        await send_verification_email(resend.email, otp, user['full_name'])
+        
+        return {'message': 'Verification code resent successfully'}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to resend verification: {str(e)}')
+
+def generate_otp() -> str:
+    """Generate 6-digit OTP"""
+    return ''.join(random.choices(string.digits, k=6))
+
+async def send_verification_email(email: str, otp: str, full_name: str):
+    """Send verification email with OTP"""
+    try:
+        smtp_server = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        smtp_username = os.getenv('SMTP_USER', 'support@dev.magnaglobal.id')
+        smtp_password = os.getenv('SMTP_PASS', 'oocdxcxzhmgcteqf')
+        
+        msg = MIMEMultipart()
+        msg['From'] = smtp_username
+        msg['To'] = email
+        msg['Subject'] = 'Email Verification - Support Ticket System'
+        
+        body = f"""
+        Hi {full_name},
+        
+        Thank you for registering! Please verify your email address using the OTP below:
+        
+        Verification Code: {otp}
+        
+        This code will expire in 10 minutes.
+        
+        Best regards,
+        Support Team
+        """
+        
+        msg.attach(MIMEText(body, 'plain'))
+        
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        server.send_message(msg)
+        server.quit()
+        
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send verification email")
