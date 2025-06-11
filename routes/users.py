@@ -106,7 +106,13 @@ async def login(user: UserLogin, db=Depends(get_db)):
             
         # Check if email is verified
         if not user_data.get('is_verified', False):
-            raise HTTPException(status_code=403, detail='Please verify your email before login')
+            raise HTTPException(
+                status_code=403, 
+                detail={
+                    'message': 'Please verify your email before login',
+                    'email': user_data['email']
+                }
+            )
             
         expiration = datetime.utcnow() + timedelta(hours=1)
         token = jwt.encode({
