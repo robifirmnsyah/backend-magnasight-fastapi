@@ -77,6 +77,14 @@ class UserVerification(BaseModel):
 class ResendVerification(BaseModel):
     email: str
 
+class ResetPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordConfirm(BaseModel):
+    email: str
+    verification_code: str
+    new_password: str
+
 # Helper function to generate unique ID
 def generate_unique_id(prefix: str) -> str:
     random_string = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
@@ -299,23 +307,80 @@ async def get_users_for_project(project_id: str, db=Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to get users for project: {str(e)}')
 
-@router.post('/verify')
-async def verify_email(verification: UserVerification, db=Depends(get_db)):
+@router.post('/reset-password-request')
+async def reset_password_request(request: ResetPasswordRequest, db=Depends(get_db)):
     try:
-        query = 'SELECT * FROM users WHERE email = $1'
-        user = await db.fetchrow(query, verification.email)
+        query = 'SELECT id_user, full_name, is_verified FROM users WHERE email = $1'
+        user = await db.fetchrow(query, request.email)
+        
         if not user:
             raise HTTPException(status_code=404, detail='User not found')
-        # Here you should verify the OTP, for now we just simulate it
-        if verification.verification_code != '123456':
-            raise HTTPException(status_code=400, detail='Invalid verification code')
-        query = 'UPDATE users SET is_verified = $1 WHERE email = $2'
-        await db.execute(query, True, verification.email)
-        return {'message': 'Email verified successfully'}
+            
+        if not user['is_verified']:
+            raise HTTPException(status_code=400, detail='Please verify your email first before reset password')
+            
+        # Generate new OTP for password reset
+        otp = generate_otp()
+        expires = datetime.utcnow() + timedelta(minutes=10)
+        
+        update_query = '''
+            UPDATE users 
+            SET verification_code = $1, verification_expires = $2 
+            WHERE email = $3
+        '''
+        await db.execute(update_query, otp, expires, request.email)
+        
+        # Send reset password email
+        await send_reset_password_email(request.email, otp, user['full_name'])
+        
+        return {'message': 'Reset password code sent to your email'}
+        
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Failed to verify email: {str(e)}')
+        raise HTTPException(status_code=500, detail=f'Failed to send reset password code: {str(e)}')
+
+@router.post('/reset-password-confirm')
+async def reset_password_confirm(reset_data: ResetPasswordConfirm, db=Depends(get_db)):
+    try:
+        query = '''
+            SELECT id_user, verification_code, verification_expires, is_verified 
+            FROM users 
+            WHERE email = $1
+        '''
+        user = await db.fetchrow(query, reset_data.email)
+        
+        if not user:
+            raise HTTPException(status_code=404, detail='User not found')
+            
+        if not user['is_verified']:
+            raise HTTPException(status_code=400, detail='Please verify your email first')
+            
+        if not user['verification_code']:
+            raise HTTPException(status_code=400, detail='No reset password request found. Please request reset password first.')
+            
+        if user['verification_expires'] < datetime.utcnow():
+            raise HTTPException(status_code=400, detail='Reset password code expired')
+            
+        if user['verification_code'] != reset_data.verification_code:
+            raise HTTPException(status_code=400, detail='Invalid reset password code')
+            
+        # Hash new password and update
+        hashed_password = bcrypt.hashpw(reset_data.new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
+        update_query = '''
+            UPDATE users 
+            SET password = $1, verification_code = NULL, verification_expires = NULL 
+            WHERE email = $2
+        '''
+        await db.execute(update_query, hashed_password, reset_data.email)
+        
+        return {'message': 'Password reset successfully. You can now login with your new password.'}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to reset password: {str(e)}')
 
 @router.post('/verify-email')
 async def verify_email(verification: UserVerification, db=Depends(get_db)):
@@ -428,3 +493,43 @@ async def send_verification_email(email: str, otp: str, full_name: str):
     except Exception as e:
         print(f"Failed to send email: {e}")
         raise HTTPException(status_code=500, detail="Failed to send verification email")
+
+async def send_reset_password_email(email: str, otp: str, full_name: str):
+    """Send reset password email with OTP"""
+    try:
+        smtp_server = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        smtp_username = os.getenv('SMTP_USER', 'support@dev.magnaglobal.id')
+        smtp_password = os.getenv('SMTP_PASS', 'oocdxcxzhmgcteqf')
+        
+        msg = MIMEMultipart()
+        msg['From'] = smtp_username
+        msg['To'] = email
+        msg['Subject'] = 'Reset Password - Support Ticket System'
+        
+        body = f"""
+        Hi {full_name},
+        
+        You requested to reset your password. Please use the OTP below to reset your password:
+        
+        Reset Password Code: {otp}
+        
+        This code will expire in 10 minutes.
+        
+        If you didn't request this, please ignore this email.
+        
+        Best regards,
+        Support Team
+        """
+        
+        msg.attach(MIMEText(body, 'plain'))
+        
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        server.send_message(msg)
+        server.quit()
+        
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send reset password email")
