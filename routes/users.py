@@ -145,24 +145,17 @@ async def register(user: UserCreate, db=Depends(get_db)):
         company = await db.fetchrow(company_query, user.company_id)
         if not company:
             raise HTTPException(status_code=404, detail='Company not found')
-            
-        # Generate OTP and expiry
-        otp = generate_otp()
-        expires = datetime.utcnow() + timedelta(minutes=10)
         
         user_query = '''
-            INSERT INTO users (id_user, role, full_name, username, password, company_id, company_name, billing_account_id, email, phone, is_verified, verification_code, verification_expires) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            INSERT INTO users (id_user, role, full_name, username, password, company_id, company_name, billing_account_id, email, phone, is_verified) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         '''
         await db.execute(user_query, id_user, user.role, user.full_name, user.username, hashed_password, 
                         user.company_id, company['company_name'], company['billing_account_id'], 
-                        user.email, user.phone, False, otp, expires)
-        
-        # Send verification email
-        await send_verification_email(user.email, otp, user.full_name)
+                        user.email, user.phone, False)
         
         return {
-            'message': 'User registered successfully. Please check your email for verification code.',
+            'message': 'User registered successfully. Please request verification code to verify your email.',
             'id_user': id_user,
             'email': user.email
         }
@@ -451,6 +444,39 @@ async def resend_verification(resend: ResendVerification, db=Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to resend verification: {str(e)}')
+
+@router.post('/send-verification')
+async def send_verification_code(resend: ResendVerification, db=Depends(get_db)):
+    try:
+        query = 'SELECT id_user, full_name, is_verified FROM users WHERE email = $1'
+        user = await db.fetchrow(query, resend.email)
+        
+        if not user:
+            raise HTTPException(status_code=404, detail='User not found')
+            
+        if user['is_verified']:
+            raise HTTPException(status_code=400, detail='Email already verified')
+            
+        # Generate new OTP
+        otp = generate_otp()
+        expires = datetime.utcnow() + timedelta(minutes=10)
+        
+        update_query = '''
+            UPDATE users 
+            SET verification_code = $1, verification_expires = $2 
+            WHERE email = $3
+        '''
+        await db.execute(update_query, otp, expires, resend.email)
+        
+        # Send verification email
+        await send_verification_email(resend.email, otp, user['full_name'])
+        
+        return {'message': 'Verification code sent successfully'}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to send verification code: {str(e)}')
 
 def generate_otp() -> str:
     """Generate 6-digit OTP"""
