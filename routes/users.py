@@ -11,10 +11,22 @@ from datetime import datetime, timedelta
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from jinja2 import Environment, FileSystemLoader
 
 router = APIRouter()
 
 SECRET_KEY = 'A1b2C3d4E5f6G7h8I9J0kLmNoPqRsTuVwXyZ1234567890!@#$%^&*()'
+
+# Setup Jinja2 environment for email templates
+template_env = Environment(loader=FileSystemLoader('templates'))
+
+def build_verification_email_html(**context):
+    template = template_env.get_template('verification_email.html')
+    return template.render(**context)
+
+def build_reset_password_email_html(**context):
+    template = template_env.get_template('reset_password_email.html')
+    return template.render(**context)
 
 # Database connection
 async def get_db():
@@ -518,12 +530,19 @@ async def send_verification_email(email: str, otp: str, full_name: str):
         smtp_username = os.getenv('SMTP_USER', 'support@dev.magnaglobal.id')
         smtp_password = os.getenv('SMTP_PASS', 'oocdxcxzhmgcteqf')
         
-        msg = MIMEMultipart()
+        # Generate HTML content using template
+        html_content = build_verification_email_html(
+            user_name=full_name,
+            otp=otp
+        )
+        
+        msg = MIMEMultipart('alternative')
         msg['From'] = smtp_username
         msg['To'] = email
         msg['Subject'] = 'Email Verification - Support Ticket System'
         
-        body = f"""
+        # Plain text fallback
+        text_body = f"""
         Hi {full_name},
         
         Thank you for registering! Please verify your email address using the OTP below:
@@ -536,7 +555,11 @@ async def send_verification_email(email: str, otp: str, full_name: str):
         Support Team
         """
         
-        msg.attach(MIMEText(body, 'plain'))
+        text_part = MIMEText(text_body, 'plain')
+        html_part = MIMEText(html_content, 'html')
+        
+        msg.attach(text_part)
+        msg.attach(html_part)
         
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
@@ -556,12 +579,19 @@ async def send_reset_password_email(email: str, otp: str, full_name: str):
         smtp_username = os.getenv('SMTP_USER', 'support@dev.magnaglobal.id')
         smtp_password = os.getenv('SMTP_PASS', 'oocdxcxzhmgcteqf')
         
-        msg = MIMEMultipart()
+        # Generate HTML content using template
+        html_content = build_reset_password_email_html(
+            user_name=full_name,
+            otp=otp
+        )
+        
+        msg = MIMEMultipart('alternative')
         msg['From'] = smtp_username
         msg['To'] = email
         msg['Subject'] = 'Reset Password - Support Ticket System'
         
-        body = f"""
+        # Plain text fallback
+        text_body = f"""
         Hi {full_name},
         
         You requested to reset your password. Please use the OTP below to reset your password:
@@ -576,7 +606,11 @@ async def send_reset_password_email(email: str, otp: str, full_name: str):
         Support Team
         """
         
-        msg.attach(MIMEText(body, 'plain'))
+        text_part = MIMEText(text_body, 'plain')
+        html_part = MIMEText(html_content, 'html')
+        
+        msg.attach(text_part)
+        msg.attach(html_part)
         
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
