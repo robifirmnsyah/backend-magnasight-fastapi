@@ -250,6 +250,10 @@ async def update_user(id_user: str, user: UserUpdate, db=Depends(get_db)):
             email_check = await db.fetchrow('SELECT 1 FROM users WHERE email = $1 AND id_user != $2', update_data['email'], id_user)
             if email_check:
                 raise HTTPException(status_code=400, detail='Email sudah digunakan')
+            # Set user as unverified when email is changed
+            update_data['is_verified'] = False
+            update_data['verification_code'] = None
+            update_data['verification_expires'] = None
                 
         # Check phone if being updated
         if 'phone' in update_data:
@@ -539,7 +543,7 @@ async def send_verification_email(email: str, otp: str, full_name: str):
         msg = MIMEMultipart('alternative')
         msg['From'] = smtp_username
         msg['To'] = email
-        msg['Subject'] = 'Email Verification - Support Ticket System'
+        msg['Subject'] = f'Email Verification - {email}'
         
         # Plain text fallback
         text_body = f"""
@@ -588,7 +592,7 @@ async def send_reset_password_email(email: str, otp: str, full_name: str):
         msg = MIMEMultipart('alternative')
         msg['From'] = smtp_username
         msg['To'] = email
-        msg['Subject'] = 'Reset Password - Support Ticket System'
+        msg['Subject'] = f'Reset Password - {email}'
         
         # Plain text fallback
         text_body = f"""
