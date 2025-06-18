@@ -247,13 +247,22 @@ async def update_user(id_user: str, user: UserUpdate, db=Depends(get_db)):
                 
         # Check email if being updated
         if 'email' in update_data:
-            email_check = await db.fetchrow('SELECT 1 FROM users WHERE email = $1 AND id_user != $2', update_data['email'], id_user)
-            if email_check:
-                raise HTTPException(status_code=400, detail='Email sudah digunakan')
-            # Set user as unverified when email is changed
-            update_data['is_verified'] = False
-            update_data['verification_code'] = None
-            update_data['verification_expires'] = None
+            # Get current email to compare
+            current_email_query = 'SELECT email FROM users WHERE id_user = $1'
+            current_user = await db.fetchrow(current_email_query, id_user)
+            
+            if not current_user:
+                raise HTTPException(status_code=404, detail='User not found')
+            
+            # Check if email is actually being changed
+            if current_user['email'] != update_data['email']:
+                email_check = await db.fetchrow('SELECT 1 FROM users WHERE email = $1 AND id_user != $2', update_data['email'], id_user)
+                if email_check:
+                    raise HTTPException(status_code=400, detail='Email sudah digunakan')
+                # Set user as unverified only when email is actually changed
+                update_data['is_verified'] = False
+                update_data['verification_code'] = None
+                update_data['verification_expires'] = None
                 
         # Check phone if being updated
         if 'phone' in update_data:
