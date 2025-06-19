@@ -1,0 +1,85 @@
+<!-- filepath: /Users/robifirmansyah/Documents/backend-magnasight-fastapi/static/google-signin.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Google Sign-in Demo</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <h1>Sign in with Google</h1>
+    <button id="google-signin-btn">Sign in with Google</button>
+    <div id="result"></div>
+
+    <script>
+        // Firebase configuration (ganti dengan config Anda)
+        const firebaseConfig = {
+            apiKey: "AIzaSyD3DxYhh2lj-bIfVzTVLXkl67a5UubF9pI",
+            authDomain: "dev-arfara-8244d.firebaseapp.com",
+            projectId: "dev-arfara-8244d",
+            storageBucket: "dev-arfara-8244d.firebasestorage.app",
+            messagingSenderId: "840001960827",
+            appId: "1:840001960827:web:449381ec9e1b391ba45bde",
+            measurementId: "G-5TC6N0FJWW"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+
+        // Google Sign-in
+        document.getElementById('google-signin-btn').addEventListener('click', async () => {
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                const result = await firebase.auth().signInWithPopup(provider);
+                const user = result.user;
+                
+                // Get Firebase ID token
+                const idToken = await user.getIdToken();
+                
+                // Send to backend
+                const response = await fetch('/api/users/google-signin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        firebase_token: idToken
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('result').innerHTML = `
+                        <h2>Success!</h2>
+                        <p>Welcome ${data.user.full_name}</p>
+                        <p>Token: ${data.token}</p>
+                    `;
+                    
+                    // Save token for future API calls
+                    localStorage.setItem('auth_token', data.token);
+                } else {
+                    if (response.status === 404) {
+                        document.getElementById('result').innerHTML = `
+                            <h2>User Not Registered</h2>
+                            <p>Please register first with email: ${data.detail.email}</p>
+                            <p>Name: ${data.detail.name}</p>
+                        `;
+                    } else {
+                        document.getElementById('result').innerHTML = `
+                            <h2>Error</h2>
+                            <p>${data.detail}</p>
+                        `;
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('result').innerHTML = `
+                    <h2>Error</h2>
+                    <p>${error.message}</p>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

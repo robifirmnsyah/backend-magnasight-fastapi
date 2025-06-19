@@ -12,6 +12,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from jinja2 import Environment, FileSystemLoader
+import firebase_admin
+from firebase_admin import credentials, auth
+import json
 
 router = APIRouter()
 
@@ -97,10 +100,38 @@ class ResetPasswordConfirm(BaseModel):
     verification_code: str
     new_password: str
 
+class GoogleSignInRequest(BaseModel):
+    firebase_token: str
+
 # Helper function to generate unique ID
 def generate_unique_id(prefix: str) -> str:
     random_string = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
     return f"{prefix}_{random_string}"
+
+# Initialize Firebase Admin
+def init_firebase():
+    try:
+        firebase_config = {
+            "type": os.getenv("FIREBASE_TYPE"),
+            "project_id": os.getenv("FIREBASE_PROJECT_ID"),
+            "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
+            "private_key": os.getenv("FIREBASE_PRIVATE_KEY").replace('\\n', '\n'),
+            "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
+            "client_id": os.getenv("FIREBASE_CLIENT_ID"),
+            "auth_uri": os.getenv("FIREBASE_AUTH_URI"),
+            "token_uri": os.getenv("FIREBASE_TOKEN_URI"),
+            "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_X509_CERT_URL")
+        }
+        
+        if not firebase_admin._apps:
+            cred = credentials.Certificate(firebase_config)
+            firebase_admin.initialize_app(cred)
+        print("Firebase initialized successfully")
+    except Exception as e:
+        print(f"Failed to initialize Firebase: {e}")
+
+# Initialize Firebase when module loads
+init_firebase()
 
 # Endpoints
 @router.post('/login')
@@ -530,6 +561,67 @@ async def send_verification_code(resend: ResendVerification, db=Depends(get_db))
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to send verification code: {str(e)}')
+
+@router.post('/google-signin')
+async def google_signin(request: GoogleSignInRequest, db=Depends(get_db)):
+    try:
+        # Verify Firebase token
+        decoded_token = auth.verify_id_token(request.firebase_token)
+        firebase_uid = decoded_token['uid']
+        firebase_email = decoded_token.get('email')
+        firebase_name = decoded_token.get('name', '')
+        
+        if not firebase_email:
+            raise HTTPException(status_code=400, detail='Email not found in Google account')
+        
+        # Check if user exists in PostgreSQL database
+        query = 'SELECT * FROM users WHERE email = $1'
+        result = await db.fetchrow(query, firebase_email)
+        
+        if not result:
+            raise HTTPException(
+                status_code=404, 
+                detail={
+                    'message': 'User not registered. Please register first before using Google Sign-in.',
+                    'email': firebase_email,
+                    'name': firebase_name
+                }
+            )
+        
+        user_data = dict(result)
+        
+        # Check if user is verified
+        if not user_data.get('is_verified', False):
+            # Auto-verify user for Google sign-in
+            update_query = 'UPDATE users SET is_verified = TRUE WHERE email = $1'
+            await db.execute(update_query, firebase_email)
+            user_data['is_verified'] = True
+        
+        # Generate JWT token
+        expiration = datetime.utcnow() + timedelta(hours=24)  # Longer expiration for Google sign-in
+        token = jwt.encode({
+            'id_user': user_data['id_user'],
+            'username': user_data['username'],
+            'role': user_data['role'],
+            'firebase_uid': firebase_uid,
+            'exp': expiration
+        }, SECRET_KEY, algorithm='HS256')
+        
+        return {
+            'message': 'Google Sign-in successful',
+            'token': token,
+            'user': {k: v for k, v in user_data.items() if k not in ['password', 'verification_code', 'verification_expires']},
+            'provider': 'google'
+        }
+        
+    except auth.InvalidIdTokenError:
+        raise HTTPException(status_code=401, detail='Invalid Firebase token')
+    except auth.ExpiredIdTokenError:
+        raise HTTPException(status_code=401, detail='Firebase token expired')
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f'Failed to sign in with Google: {str(e)}')
 
 def generate_otp() -> str:
     """Generate 6-digit OTP"""
