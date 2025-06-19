@@ -30,6 +30,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    env_file:
+      - .env
+      - .env.production
     environment:
       DB_HOST: postgres
       DB_USER: ${DB_USER}

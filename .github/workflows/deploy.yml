@@ -54,6 +54,21 @@ jobs:
           echo "Pulling latest image..."
           docker compose pull
 
+          echo "Setting up environment variables..."
+          # Create .env.production with Firebase secret
+          cat > .env.production << EOF
+          FIREBASE_SA_JSON='${{ secrets.FIREBASE_SA_JSON }}'
+          EOF
+
           echo "Starting containers..."
           docker compose up -d
           echo "Deployment completed successfully!"
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting for containers to start..."
+          sleep 10
+          echo "Checking container status..."
+          docker compose ps
+          echo "Checking application logs..."
+          docker compose logs --tail=20 api
