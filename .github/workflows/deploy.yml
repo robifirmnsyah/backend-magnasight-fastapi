@@ -42,6 +42,7 @@ jobs:
         run: |
           cd ~/backend-magnasight-fastapi
           echo "Pulling latest code from repository..."
+          git config pull.rebase false
           git pull
 
       - name: Deploy containers
