@@ -111,7 +111,28 @@ def generate_unique_id(prefix: str) -> str:
 # Initialize Firebase Admin
 def init_firebase():
     try:
-        # Check if all required Firebase environment variables are present
+        # Skip if already initialized
+        if firebase_admin._apps:
+            print("Firebase already initialized")
+            return True
+            
+        # Priority 1: Try to get Firebase config from JSON secret first
+        firebase_sa_json = os.getenv("FIREBASE_SA_JSON")
+        
+        if firebase_sa_json:
+            try:
+                # Parse JSON string to dict
+                firebase_config = json.loads(firebase_sa_json)
+                cred = credentials.Certificate(firebase_config)
+                firebase_admin.initialize_app(cred)
+                print(f"Firebase initialized successfully from JSON secret for project: {firebase_config.get('project_id')}")
+                return True
+            except json.JSONDecodeError as e:
+                print(f"Error parsing FIREBASE_SA_JSON: {e}")
+            except Exception as e:
+                print(f"Error initializing Firebase from JSON: {e}")
+        
+        # Priority 2: Fallback to individual environment variables
         required_vars = [
             "FIREBASE_TYPE", "FIREBASE_PROJECT_ID", "FIREBASE_PRIVATE_KEY_ID",
             "FIREBASE_PRIVATE_KEY", "FIREBASE_CLIENT_EMAIL", "FIREBASE_CLIENT_ID"
@@ -120,7 +141,7 @@ def init_firebase():
         missing_vars = [var for var in required_vars if not os.getenv(var)]
         if missing_vars:
             print(f"Firebase initialization skipped. Missing environment variables: {missing_vars}")
-            return
+            return False
             
         private_key = os.getenv("FIREBASE_PRIVATE_KEY")
         if private_key:
@@ -139,12 +160,14 @@ def init_firebase():
             "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_X509_CERT_URL")
         }
         
-        if not firebase_admin._apps:
-            cred = credentials.Certificate(firebase_config)
-            firebase_admin.initialize_app(cred)
-        print("Firebase initialized successfully")
+        cred = credentials.Certificate(firebase_config)
+        firebase_admin.initialize_app(cred)
+        print(f"Firebase initialized successfully from environment variables for project: {firebase_config.get('project_id')}")
+        return True
+        
     except Exception as e:
         print(f"Failed to initialize Firebase: {e}")
+        return False
 
 # Initialize Firebase when module loads
 init_firebase()
@@ -581,8 +604,22 @@ async def send_verification_code(resend: ResendVerification, db=Depends(get_db))
 @router.post('/google-signin')
 async def google_signin(request: GoogleSignInRequest, db=Depends(get_db)):
     try:
+        # Check if Firebase is initialized, try to initialize if not
+        if not firebase_admin._apps:
+            print("Firebase not initialized, attempting to initialize...")
+            if not init_firebase():
+                raise HTTPException(
+                    status_code=500, 
+                    detail="Firebase initialization failed. Please check FIREBASE_SA_JSON secret configuration."
+                )
+        
         # Verify Firebase token
-        decoded_token = auth.verify_id_token(request.firebase_token)
+        try:
+            decoded_token = auth.verify_id_token(request.firebase_token)
+        except Exception as e:
+            print(f"Firebase token verification error: {e}")
+            raise HTTPException(status_code=401, detail=f"Invalid Firebase token: {str(e)}")
+            
         firebase_uid = decoded_token['uid']
         firebase_email = decoded_token.get('email')
         firebase_name = decoded_token.get('name', '')
@@ -637,6 +674,7 @@ async def google_signin(request: GoogleSignInRequest, db=Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Google sign-in error: {e}")
         raise HTTPException(status_code=500, detail=f'Failed to sign in with Google: {str(e)}')
 
 def generate_otp() -> str:
@@ -742,3 +780,43 @@ async def send_reset_password_email(email: str, otp: str, full_name: str):
     except Exception as e:
         print(f"Failed to send email: {e}")
         raise HTTPException(status_code=500, detail="Failed to send reset password email")
+
+@router.get('/firebase-status')
+async def firebase_status():
+    """Debug endpoint to check Firebase status"""
+    try:
+        firebase_sa_json = os.getenv("FIREBASE_SA_JSON")
+        has_json_secret = bool(firebase_sa_json)
+        
+        # Check individual env vars
+        required_vars = [
+            "FIREBASE_TYPE", "FIREBASE_PROJECT_ID", "FIREBASE_PRIVATE_KEY_ID",
+            "FIREBASE_PRIVATE_KEY", "FIREBASE_CLIENT_EMAIL", "FIREBASE_CLIENT_ID"
+        ]
+        missing_vars = [var for var in required_vars if not os.getenv(var)]
+        
+        firebase_initialized = bool(firebase_admin._apps)
+        
+        # Try to get project info if initialized
+        project_info = None
+        if firebase_initialized and firebase_admin._apps:
+            try:
+                app = firebase_admin.get_app()
+                project_info = getattr(app, 'project_id', 'Unknown')
+            except:
+                project_info = "Error getting project info"
+        
+        return {
+            "firebase_initialized": firebase_initialized,
+            "has_json_secret": has_json_secret,
+            "missing_env_vars": missing_vars,
+            "total_firebase_apps": len(firebase_admin._apps),
+            "json_secret_length": len(firebase_sa_json) if firebase_sa_json else 0,
+            "project_info": project_info,
+            "initialization_attempted": False
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "firebase_initialized": False
+        }
