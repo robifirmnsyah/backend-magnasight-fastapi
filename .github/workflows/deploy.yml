@@ -46,19 +46,6 @@ jobs:
           git reset --hard origin/main
           git pull
 
-      - name: Setup environment variables
-        run: |
-          cd ~/backend-magnasight-fastapi
-          echo "Setting up environment variables..."
-          
-          # Write Firebase secret to .env.production using cat with heredoc
-          cat > .env.production << 'FIREBASE_EOF'
-          FIREBASE_SA_JSON=${{ secrets.FIREBASE_SA_JSON }}
-          FIREBASE_EOF
-          
-          echo "Environment file created successfully"
-          echo "File size: $(wc -c < .env.production) bytes"
-
       - name: Deploy containers
         run: |
           cd ~/backend-magnasight-fastapi
@@ -68,14 +55,8 @@ jobs:
           echo "Pulling latest image..."
           docker compose pull
 
-          echo "Loading production environment variables..."
-          if [ -f .env.production ]; then
-            export $(cat .env.production | xargs)
-            echo "Production environment variables loaded"
-          fi
-
-          echo "Starting containers..."
-          docker compose up -d
+          echo "Starting containers with Firebase secret..."
+          FIREBASE_SA_JSON='${{ secrets.FIREBASE_SA_JSON }}' docker compose up -d
           echo "Deployment completed successfully!"
 
       - name: Verify deployment
