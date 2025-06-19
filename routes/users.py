@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, File, UploadFile, Form
 from pydantic import BaseModel, constr
 from typing import List, Optional
 import asyncpg
@@ -30,6 +30,32 @@ def build_verification_email_html(**context):
 def build_reset_password_email_html(**context):
     template = template_env.get_template('reset_password_email.html')
     return template.render(**context)
+
+# Firebase initialization using FIREBASE_SA_JSON secret
+
+def init_firebase():
+    try:
+        if firebase_admin._apps:
+            print("Firebase already initialized")
+            return True
+        firebase_sa_json = os.getenv("FIREBASE_SA_JSON")
+        if firebase_sa_json:
+            try:
+                firebase_config = json.loads(firebase_sa_json)
+                cred = credentials.Certificate(firebase_config)
+                firebase_admin.initialize_app(cred)
+                print(f"Firebase initialized successfully from JSON secret for project: {firebase_config.get('project_id')}")
+                return True
+            except Exception as e:
+                print(f"Error initializing Firebase from JSON: {e}")
+                return False
+        print("Firebase initialization skipped. FIREBASE_SA_JSON not found.")
+        return False
+    except Exception as e:
+        print(f"Failed to initialize Firebase: {e}")
+        return False
+
+init_firebase()
 
 # Database connection
 async def get_db():
@@ -108,71 +134,6 @@ def generate_unique_id(prefix: str) -> str:
     random_string = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
     return f"{prefix}_{random_string}"
 
-# Initialize Firebase Admin
-def init_firebase():
-    try:
-        # Skip if already initialized
-        if firebase_admin._apps:
-            print("Firebase already initialized")
-            return True
-            
-        # Priority 1: Try to get Firebase config from JSON secret first
-        firebase_sa_json = os.getenv("FIREBASE_SA_JSON")
-        
-        if firebase_sa_json:
-            try:
-                # Parse JSON string to dict
-                firebase_config = json.loads(firebase_sa_json)
-                cred = credentials.Certificate(firebase_config)
-                firebase_admin.initialize_app(cred)
-                print(f"Firebase initialized successfully from JSON secret for project: {firebase_config.get('project_id')}")
-                return True
-            except json.JSONDecodeError as e:
-                print(f"Error parsing FIREBASE_SA_JSON: {e}")
-            except Exception as e:
-                print(f"Error initializing Firebase from JSON: {e}")
-        
-        # Priority 2: Fallback to individual environment variables
-        required_vars = [
-            "FIREBASE_TYPE", "FIREBASE_PROJECT_ID", "FIREBASE_PRIVATE_KEY_ID",
-            "FIREBASE_PRIVATE_KEY", "FIREBASE_CLIENT_EMAIL", "FIREBASE_CLIENT_ID"
-        ]
-        
-        missing_vars = [var for var in required_vars if not os.getenv(var)]
-        if missing_vars:
-            print(f"Firebase initialization skipped. Missing environment variables: {missing_vars}")
-            return False
-            
-        private_key = os.getenv("FIREBASE_PRIVATE_KEY")
-        if private_key:
-            private_key = private_key.replace('\\n', '\n')
-        
-        firebase_config = {
-            "type": os.getenv("FIREBASE_TYPE"),
-            "project_id": os.getenv("FIREBASE_PROJECT_ID"),
-            "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
-            "private_key": private_key,
-            "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
-            "client_id": os.getenv("FIREBASE_CLIENT_ID"),
-            "auth_uri": os.getenv("FIREBASE_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
-            "token_uri": os.getenv("FIREBASE_TOKEN_URI", "https://oauth2.googleapis.com/token"),
-            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_X509_CERT_URL")
-        }
-        
-        cred = credentials.Certificate(firebase_config)
-        firebase_admin.initialize_app(cred)
-        print(f"Firebase initialized successfully from environment variables for project: {firebase_config.get('project_id')}")
-        return True
-        
-    except Exception as e:
-        print(f"Failed to initialize Firebase: {e}")
-        return False
-
-# Initialize Firebase when module loads
-init_firebase()
-
-# Endpoints
 @router.post('/login')
 async def login(user: UserLogin, db=Depends(get_db)):
     try:
@@ -414,268 +375,7 @@ async def get_projects_for_user(id_user: str, db=Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to get projects for user: {str(e)}')
 
-@router.get('/project/{project_id}', response_model=List[str])
-async def get_users_for_project(project_id: str, db=Depends(get_db)):
-    try:
-        query = 'SELECT id_user FROM user_projects WHERE project_id = $1'
-        results = await db.fetch(query, project_id)
-        return [row['id_user'] for row in results]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Failed to get users for project: {str(e)}')
-
-@router.post('/reset-password-request')
-async def reset_password_request(request: ResetPasswordRequest, db=Depends(get_db)):
-    try:
-        query = 'SELECT id_user, full_name, is_verified FROM users WHERE email = $1'
-        user = await db.fetchrow(query, request.email)
-        
-        if not user:
-            raise HTTPException(status_code=404, detail='User not found')
-            
-        if not user['is_verified']:
-            raise HTTPException(status_code=400, detail='Please verify your email first before reset password')
-            
-        # Generate new OTP for password reset
-        otp = generate_otp()
-        expires = datetime.utcnow() + timedelta(minutes=10)
-        
-        update_query = '''
-            UPDATE users 
-            SET verification_code = $1, verification_expires = $2 
-            WHERE email = $3
-        '''
-        await db.execute(update_query, otp, expires, request.email)
-        
-        # Send reset password email
-        await send_reset_password_email(request.email, otp, user['full_name'])
-        
-        return {'message': 'Reset password code sent to your email'}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Failed to send reset password code: {str(e)}')
-
-@router.post('/reset-password-confirm')
-async def reset_password_confirm(reset_data: ResetPasswordConfirm, db=Depends(get_db)):
-    try:
-        query = '''
-            SELECT id_user, verification_code, verification_expires, is_verified 
-            FROM users 
-            WHERE email = $1
-        '''
-        user = await db.fetchrow(query, reset_data.email)
-        
-        if not user:
-            raise HTTPException(status_code=404, detail='User not found')
-            
-        if not user['is_verified']:
-            raise HTTPException(status_code=400, detail='Please verify your email first')
-            
-        if not user['verification_code']:
-            raise HTTPException(status_code=400, detail='No reset password request found. Please request reset password first.')
-            
-        if user['verification_expires'] < datetime.utcnow():
-            raise HTTPException(status_code=400, detail='Reset password code expired')
-            
-        if user['verification_code'] != reset_data.verification_code:
-            raise HTTPException(status_code=400, detail='Invalid reset password code')
-            
-        # Hash new password and update
-        hashed_password = bcrypt.hashpw(reset_data.new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        
-        update_query = '''
-            UPDATE users 
-            SET password = $1, verification_code = NULL, verification_expires = NULL 
-            WHERE email = $2
-        '''
-        await db.execute(update_query, hashed_password, reset_data.email)
-        
-        return {'message': 'Password reset successfully. You can now login with your new password.'}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Failed to reset password: {str(e)}')
-
-@router.post('/verify-email')
-async def verify_email(verification: UserVerification, db=Depends(get_db)):
-    try:
-        query = '''
-            SELECT id_user, verification_code, verification_expires, is_verified 
-            FROM users 
-            WHERE email = $1
-        '''
-        user = await db.fetchrow(query, verification.email)
-        
-        if not user:
-            raise HTTPException(status_code=404, detail='User not found')
-            
-        if user['is_verified']:
-            raise HTTPException(status_code=400, detail='Email already verified')
-            
-        if user['verification_expires'] < datetime.utcnow():
-            raise HTTPException(status_code=400, detail='Verification code expired')
-            
-        if user['verification_code'] != verification.verification_code:
-            raise HTTPException(status_code=400, detail='Invalid verification code')
-            
-        # Update user as verified
-        update_query = '''
-            UPDATE users 
-            SET is_verified = TRUE, verification_code = NULL, verification_expires = NULL 
-            WHERE email = $1
-        '''
-        await db.execute(update_query, verification.email)
-        
-        return {'message': 'Email verified successfully. You can now login.'}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Failed to verify email: {str(e)}')
-
-@router.post('/resend-verification')
-async def resend_verification(resend: ResendVerification, db=Depends(get_db)):
-    try:
-        query = 'SELECT id_user, full_name, is_verified FROM users WHERE email = $1'
-        user = await db.fetchrow(query, resend.email)
-        
-        if not user:
-            raise HTTPException(status_code=404, detail='User not found')
-            
-        if user['is_verified']:
-            raise HTTPException(status_code=400, detail='Email already verified')
-            
-        # Generate new OTP
-        otp = generate_otp()
-        expires = datetime.utcnow() + timedelta(minutes=10)
-        
-        update_query = '''
-            UPDATE users 
-            SET verification_code = $1, verification_expires = $2 
-            WHERE email = $3
-        '''
-        await db.execute(update_query, otp, expires, resend.email)
-        
-        # Send verification email
-        await send_verification_email(resend.email, otp, user['full_name'])
-        
-        return {'message': 'Verification code resent successfully'}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Failed to resend verification: {str(e)}')
-
-@router.post('/send-verification')
-async def send_verification_code(resend: ResendVerification, db=Depends(get_db)):
-    try:
-        query = 'SELECT id_user, full_name, is_verified FROM users WHERE email = $1'
-        user = await db.fetchrow(query, resend.email)
-        
-        if not user:
-            raise HTTPException(status_code=404, detail='User not found')
-            
-        if user['is_verified']:
-            raise HTTPException(status_code=400, detail='Email already verified')
-            
-        # Generate new OTP
-        otp = generate_otp()
-        expires = datetime.utcnow() + timedelta(minutes=10)
-        
-        update_query = '''
-            UPDATE users 
-            SET verification_code = $1, verification_expires = $2 
-            WHERE email = $3
-        '''
-        await db.execute(update_query, otp, expires, resend.email)
-        
-        # Send verification email
-        await send_verification_email(resend.email, otp, user['full_name'])
-        
-        return {'message': 'Verification code sent successfully'}
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f'Failed to send verification code: {str(e)}')
-
-@router.post('/google-signin')
-async def google_signin(request: GoogleSignInRequest, db=Depends(get_db)):
-    try:
-        # Check if Firebase is initialized, try to initialize if not
-        if not firebase_admin._apps:
-            print("Firebase not initialized, attempting to initialize...")
-            if not init_firebase():
-                raise HTTPException(
-                    status_code=500, 
-                    detail="Firebase initialization failed. Please check FIREBASE_SA_JSON secret configuration."
-                )
-        
-        # Verify Firebase token
-        try:
-            decoded_token = auth.verify_id_token(request.firebase_token)
-        except Exception as e:
-            print(f"Firebase token verification error: {e}")
-            raise HTTPException(status_code=401, detail=f"Invalid Firebase token: {str(e)}")
-            
-        firebase_uid = decoded_token['uid']
-        firebase_email = decoded_token.get('email')
-        firebase_name = decoded_token.get('name', '')
-        
-        if not firebase_email:
-            raise HTTPException(status_code=400, detail='Email not found in Google account')
-        
-        # Check if user exists in PostgreSQL database
-        query = 'SELECT * FROM users WHERE email = $1'
-        result = await db.fetchrow(query, firebase_email)
-        
-        if not result:
-            raise HTTPException(
-                status_code=404, 
-                detail={
-                    'message': 'User not registered. Please register first before using Google Sign-in.',
-                    'email': firebase_email,
-                    'name': firebase_name
-                }
-            )
-        
-        user_data = dict(result)
-        
-        # Check if user is verified
-        if not user_data.get('is_verified', False):
-            # Auto-verify user for Google sign-in
-            update_query = 'UPDATE users SET is_verified = TRUE WHERE email = $1'
-            await db.execute(update_query, firebase_email)
-            user_data['is_verified'] = True
-        
-        # Generate JWT token
-        expiration = datetime.utcnow() + timedelta(hours=24)  # Longer expiration for Google sign-in
-        token = jwt.encode({
-            'id_user': user_data['id_user'],
-            'username': user_data['username'],
-            'role': user_data['role'],
-            'firebase_uid': firebase_uid,
-            'exp': expiration
-        }, SECRET_KEY, algorithm='HS256')
-        
-        return {
-            'message': 'Google Sign-in successful',
-            'token': token,
-            'user': {k: v for k, v in user_data.items() if k not in ['password', 'verification_code', 'verification_expires']},
-            'provider': 'google'
-        }
-        
-    except auth.InvalidIdTokenError:
-        raise HTTPException(status_code=401, detail='Invalid Firebase token')
-    except auth.ExpiredIdTokenError:
-        raise HTTPException(status_code=401, detail='Firebase token expired')
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Google sign-in error: {e}")
-        raise HTTPException(status_code=500, detail=f'Failed to sign in with Google: {str(e)}')
+# Fungsi helper di bawah ini dipindahkan ke luar endpoint
 
 def generate_otp() -> str:
     """Generate 6-digit OTP"""
@@ -688,44 +388,31 @@ async def send_verification_email(email: str, otp: str, full_name: str):
         smtp_port = int(os.getenv('SMTP_PORT', '587'))
         smtp_username = os.getenv('SMTP_USER', 'support@dev.magnaglobal.id')
         smtp_password = os.getenv('SMTP_PASS', 'oocdxcxzhmgcteqf')
-        
-        # Generate HTML content using template
         html_content = build_verification_email_html(
             user_name=full_name,
             otp=otp
         )
-        
         msg = MIMEMultipart('alternative')
         msg['From'] = smtp_username
         msg['To'] = email
         msg['Subject'] = f'Email Verification - {email}'
-        
-        # Plain text fallback
         text_body = f"""
         Hi {full_name},
-        
         Thank you for registering! Please verify your email address using the OTP below:
-        
         Verification Code: {otp}
-        
         This code will expire in 10 minutes.
-        
         Best regards,
         Support Team
         """
-        
         text_part = MIMEText(text_body, 'plain')
         html_part = MIMEText(html_content, 'html')
-        
         msg.attach(text_part)
         msg.attach(html_part)
-        
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
         server.login(smtp_username, smtp_password)
         server.send_message(msg)
         server.quit()
-        
     except Exception as e:
         print(f"Failed to send email: {e}")
         raise HTTPException(status_code=500, detail="Failed to send verification email")
@@ -737,46 +424,32 @@ async def send_reset_password_email(email: str, otp: str, full_name: str):
         smtp_port = int(os.getenv('SMTP_PORT', '587'))
         smtp_username = os.getenv('SMTP_USER', 'support@dev.magnaglobal.id')
         smtp_password = os.getenv('SMTP_PASS', 'oocdxcxzhmgcteqf')
-        
-        # Generate HTML content using template
         html_content = build_reset_password_email_html(
             user_name=full_name,
             otp=otp
         )
-        
         msg = MIMEMultipart('alternative')
         msg['From'] = smtp_username
         msg['To'] = email
         msg['Subject'] = f'Reset Password - {email}'
-        
-        # Plain text fallback
         text_body = f"""
         Hi {full_name},
-        
         You requested to reset your password. Please use the OTP below to reset your password:
-        
         Reset Password Code: {otp}
-        
         This code will expire in 10 minutes.
-        
         If you didn't request this, please ignore this email.
-        
         Best regards,
         Support Team
         """
-        
         text_part = MIMEText(text_body, 'plain')
         html_part = MIMEText(html_content, 'html')
-        
         msg.attach(text_part)
         msg.attach(html_part)
-        
         server = smtplib.SMTP(smtp_server, smtp_port)
         server.starttls()
         server.login(smtp_username, smtp_password)
         server.send_message(msg)
         server.quit()
-        
     except Exception as e:
         print(f"Failed to send email: {e}")
         raise HTTPException(status_code=500, detail="Failed to send reset password email")

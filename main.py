@@ -1,14 +1,10 @@
 from typing import Union
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from routes import users, customers, tickets, groups, projects, services
 from database import connect_to_db, close_db_connection
 
 app = FastAPI(title="Magnasight API", version="0.2.0")
-
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 origins = ["*"]
 
