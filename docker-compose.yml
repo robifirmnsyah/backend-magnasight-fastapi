@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:latest
@@ -32,7 +30,6 @@ services:
         condition: service_healthy
     env_file:
       - .env
-      - .env.production
     environment:
       DB_HOST: postgres
       DB_USER: ${DB_USER}
@@ -45,6 +42,17 @@ services:
       SMTP_USER: support@dev.magnaglobal.id
       SMTP_PASS: oocdxcxzhmgcteqf
       GOOGLE_APPLICATION_CREDENTIALS: /gcp-sa.json
+      # Firebase configuration from environment variables
+      FIREBASE_SA_JSON: ${FIREBASE_SA_JSON:-}
+      FIREBASE_TYPE: ${FIREBASE_TYPE:-service_account}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-dev-arfara-8244d}
+      FIREBASE_PRIVATE_KEY_ID: ${FIREBASE_PRIVATE_KEY_ID:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+      FIREBASE_CLIENT_ID: ${FIREBASE_CLIENT_ID:-}
+      FIREBASE_AUTH_URI: ${FIREBASE_AUTH_URI:-https://accounts.google.com/o/oauth2/auth}
+      FIREBASE_TOKEN_URI: ${FIREBASE_TOKEN_URI:-https://oauth2.googleapis.com/token}
+      FIREBASE_CLIENT_X509_CERT_URL: ${FIREBASE_CLIENT_X509_CERT_URL:-}
     volumes:
       - ./gcp-sa.json:/gcp-sa.json
     networks:
