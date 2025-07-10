@@ -119,8 +119,15 @@ async def get_project(project_id: str, db=Depends(get_db)):
 @router.get('/company/{company_id}', response_model=List[Project])
 async def get_projects_by_company_id(company_id: str, db=Depends(get_db)):
     try:
-        query = 'SELECT project_id, company_id, billing_account_id FROM projects WHERE company_id = $1'
-        results = await db.fetch(query, company_id)
+        # Logika khusus untuk company COMP-73655 - mendapatkan semua project
+        if company_id == "COMP-73655":
+            query = 'SELECT project_id, company_id, billing_account_id FROM projects'
+            results = await db.fetch(query)
+        else:
+            # Logika normal untuk company lain - hanya project milik company tersebut
+            query = 'SELECT project_id, company_id, billing_account_id FROM projects WHERE company_id = $1'
+            results = await db.fetch(query, company_id)
+        
         if not results:
             raise HTTPException(status_code=404, detail='No projects found for this company')
         return [dict(result) for result in results]
