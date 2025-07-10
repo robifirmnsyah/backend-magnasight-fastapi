@@ -143,7 +143,7 @@ async def add_users_to_group(group_id: str, id_users: List[str], db=Depends(get_
         query = 'INSERT INTO user_groups (id_user, group_id) VALUES ($1, $2)'
         await db.executemany(query, [(id_user, group_id) for id_user in new_users])
         # Tambahkan akses ke semua project di grup untuk user baru
-        project_query = 'SELECT project_id FROM group_projects WHERE group_id = $1'
+        project_query = 'SELECT project_id, billing_account_id FROM group_projects gp JOIN projects p ON gp.project_id = p.project_id WHERE gp.group_id = $1'
         projects = await db.fetch(project_query, group_id)
         for id_user in new_users:
             for project in projects:
@@ -151,8 +151,8 @@ async def add_users_to_group(group_id: str, id_users: List[str], db=Depends(get_
                 exists_user_project = await db.fetchrow(check_user_project, id_user, project['project_id'])
                 if not exists_user_project:
                     await db.execute(
-                        'INSERT INTO user_projects (id_user, project_id, on_group) VALUES ($1, $2, $3)',
-                        id_user, project['project_id'], group_id
+                        'INSERT INTO user_projects (id_user, project_id, billing_id, on_group) VALUES ($1, $2, $3, $4)',
+                        id_user, project['project_id'], project['billing_account_id'], group_id
                     )
         return {'message': 'Users added to group successfully', 'added_users': new_users}
     except HTTPException:
@@ -231,7 +231,13 @@ async def add_projects_to_group(group_id: str, project_ids: List[str] = Body(...
                 check_user_project = 'SELECT 1 FROM user_projects WHERE id_user = $1 AND project_id = $2'
                 exists_user_project = await db.fetchrow(check_user_project, user['id_user'], project_id)
                 if not exists_user_project:
-                    await db.execute('INSERT INTO user_projects (id_user, project_id) VALUES ($1, $2)', user['id_user'], project_id)
+                    # Ambil billing_account_id dari projects
+                    project_billing = await db.fetchrow('SELECT billing_account_id FROM projects WHERE project_id = $1', project_id)
+                    billing_id = project_billing['billing_account_id'] if project_billing else None
+                    await db.execute(
+                        'INSERT INTO user_projects (id_user, project_id, billing_id, on_group) VALUES ($1, $2, $3, $4)', 
+                        user['id_user'], project_id, billing_id, group_id
+                    )
         return {
             "message": "Finished processing projects",
             "added": added,

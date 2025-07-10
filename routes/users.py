@@ -85,6 +85,10 @@ class UserProject(BaseModel):
     project_id: str
     on_group: Optional[str] = None
 
+class UserProjectResponse(BaseModel):
+    project_id: str
+    billing_id: str
+
 class UserVerification(BaseModel):
     email: str
     verification_code: str
@@ -500,20 +504,31 @@ async def add_user_to_project(user_project: UserProject, db=Depends(get_db)):
         exists = await db.fetchrow(check_query, user_project.id_user, user_project.project_id)
         if exists:
             raise HTTPException(status_code=400, detail='User already assigned to this project')
-        query = 'INSERT INTO user_projects (id_user, project_id, on_group) VALUES ($1, $2, $3)'
-        await db.execute(query, user_project.id_user, user_project.project_id, None)
+        
+        # Ambil billing_account_id dari tabel projects
+        project_query = 'SELECT billing_account_id FROM projects WHERE project_id = $1'
+        project = await db.fetchrow(project_query, user_project.project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail='Project not found')
+        
+        query = 'INSERT INTO user_projects (id_user, project_id, billing_id, on_group) VALUES ($1, $2, $3, $4)'
+        await db.execute(query, user_project.id_user, user_project.project_id, project['billing_account_id'], None)
         return {'message': 'User added to project'}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to add user to project: {str(e)}')
 
-@router.get('/project/{id_user}', response_model=List[str])
+@router.get('/project/{id_user}', response_model=List[UserProjectResponse])
 async def get_projects_for_user(id_user: str, db=Depends(get_db)):
     try:
-        query = 'SELECT project_id FROM user_projects WHERE id_user = $1'
+        query = '''
+            SELECT up.project_id, up.billing_id 
+            FROM user_projects up 
+            WHERE up.id_user = $1
+        '''
         results = await db.fetch(query, id_user)
-        return [row['project_id'] for row in results]
+        return [{"project_id": row['project_id'], "billing_id": row['billing_id']} for row in results]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f'Failed to get projects for user: {str(e)}')
 
